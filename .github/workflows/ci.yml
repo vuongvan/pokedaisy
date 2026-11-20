@@ -34,6 +34,7 @@ jobs:
 
       # This job builds without n3ds. Keep the optional Azahar tree (and its unrelated Android wrappers) out;
       # required submodules remain recursive and the wrapper validation step checks every checked-out wrapper.
+      
       - name: Native dependencies (default features)
         run: git -c submodule.third_party/azahar.update=none submodule update --init --recursive
 
@@ -76,6 +77,14 @@ jobs:
       - name: Debug APK (Kotlin + the native mGBA / rcheevos build)
         run: ./gradlew :app:assembleDebug --stacktrace
 
+      - name: Upload debug APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+          
       - name: Test reports
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

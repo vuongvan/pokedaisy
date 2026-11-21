@@ -88,7 +88,7 @@ android {
     ndkVersion = "28.2.13676358"
 
     defaultConfig {
-        applicationId = "com.pokedaisy.app"
+        applicationId = "com.pokedaisy.appfix"
         minSdk = 26
         targetSdk = 34
         // Bump both for every GitHub release: the updater compares versionName

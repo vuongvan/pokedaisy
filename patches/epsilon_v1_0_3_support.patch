@@ -44,10 +44,10 @@ index 482c131..df22aa1 100644
  
  /** Its bag ([PackedBagLayout]): 6-byte pocket entries, the TM pocket (index 2) a bit per machine. */
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/NativeConfigsGen.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/NativeConfigsGen.kt
-index 83e4ff4..bd44263 100644
+index 83e4ff4..4d90a2e 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/companion/data/NativeConfigsGen.kt
 +++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/NativeConfigsGen.kt
-@@ -3435,6 +3435,54 @@ val NATIVE_EPSILON_EMERALD = NativeConfig(
+@@ -3435,6 +3435,67 @@ val NATIVE_EPSILON_EMERALD = NativeConfig(
      fieldItems = FIELD_ITEMS_EPSILON_EMERALD,
  )
  
@@ -65,9 +65,10 @@ index 83e4ff4..bd44263 100644
 +// - ROM: gItems 0x08FEECA4 (found from "Master Ball" and a 36-byte stride; the GF header's gItems is the same), the icon
 +// tables from the GF header (0x08000138, 0x08000140) and the literal pool words that name them, gMonPaletteTable 0x08BE5D40
 +// (header 0x08000130).
-+// NOT in this config (the addresses weren't found yet, so nothing reads them): the battle menu handlers and cursors (touch
-+// battle control, one-press picks), the Pokédex / HERE tables, PC anywhere and FLY, and WIDE. The battle RAM below is 1.0.0's
-+// and not checked on 1.0.3: a battle's panel is the first thing to look at when this goes on a device.
++// The battle menu handlers are 1.0.0's +0x10: each found by its prologue and a literal pool naming the same gMain, cursor,
++// gBattleStruct, gBattleTypeFlags and gBattlerControllerFuncs RAM as in 1.0.0 (so that RAM is 1.0.0's too).
++// The Pokédex tables (POKEDEX_EPSILON_EMERALD_V1_0_3, Pokedex.kt) were each found by their content.
++// NOT in this config (the addresses weren't found yet, so nothing reads them): the HERE tables, PC anywhere and FLY, and WIDE.
 +val NATIVE_EPSILON_EMERALD_V1_0_3 = NativeConfig(
 +    itemDescs = ItemDescTable(0x08FEECA4L, 36, 0x14, count = 629),
 +    playerParty = 0x020251A0L,
@@ -97,11 +98,52 @@ index 83e4ff4..bd44263 100644
 +    eggSpecies = 446,
 +    itemIconTable = 0x090A38B8L,
 +    enemyParty = 0x020253F8L,
++    battlerControllerFuncs = 0x03004520L,
++    handleInputChooseAction = 0x08875869L,
++    handleInputChooseMove = 0x088762F9L,
++    completeWhenChoseItem = 0x088783E1L,
++    waitForMonSelection = 0x08878325L,
++    handleInputChooseTarget = 0x08875B95L,
++    battlerPartyIndexes = 0x02024C3AL,
++    battleStructPtr = 0x02025100L,
++    actionCursor = 0x02025110L,
++    moveCursor = 0x02025114L,
++    partyMenu = 0x0203DE3CL,
++    pokedex = POKEDEX_EPSILON_EMERALD_V1_0_3,
 +)
 +
  // ---- gamedata/gen3/hacks/gaia.toml ----
  
  // Pokémon Gaia v3.2 - another large (32 MB) BPRE hack, verified 2026-09-20 the
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/Pokedex.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/Pokedex.kt
+index 1db2b40..f56f6a6 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/data/Pokedex.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/Pokedex.kt
+@@ -1355,6 +1355,24 @@ val POKEDEX_EPSILON_EMERALD = POKEDEX_EMERALD.copy(
+     flags = DexFlags(DexFlagBlock.SAVE_BLOCK_2, 0x60, 0x28, 56, seenOrCaught = true),
+ )
+ 
++/**
++ * Epsilon Emerald v1.0.3's dex tables: the same shapes as [POKEDEX_EPSILON_EMERALD] at the rebuilt ROM's addresses, each found
++ * by its content, not by a shift (the ROM moved by a different amount per table):
++ * gPokedexEntries 0x08FD0510 (+0x86C; BULBASAUR's page "Seed", height 7, weight 69), the front pics 0x08BEDDD4 and the palettes
++ * 0x08BE5D40 (the GF header's own words, +0x680), gBaseStats 0x08C192DC (+0x684: BULBASAUR's 45 / 49 / 49 / 45 / 65 / 65, Grass /
++ * Poison at the 0x24-byte record 1), sSpeciesToNationalPokedexNum 0x08C150BC and sHoennToNationalOrder 0x08C15524 (252 TREECKO
++ * first), the ability names 0x08C0B11C ("-------", "Stench") (all +0x680), the footprints 0x08FD39D4 (a pointer table by species
++ * whose entry 0 repeats entry 1, named by the literal pool at 0x088F3B58), the evolutions 0x08C2966E (+0x6A0: BULBASAUR 16 ->
++ * IVYSAUR, CHARMANDER 16 -> 5, SQUIRTLE 16 -> 8, PIKACHU's stone row) and the level-up lists 0x08C2F320 (+0x6A0: species 1's
++ * Tackle 1 / Growl 3 / Leech Seed 7, CHARMANDER at 4's Scratch, Growl, Ember 7). The flags are RAM and the same.
++ */
++val POKEDEX_EPSILON_EMERALD_V1_0_3 = POKEDEX_EPSILON_EMERALD.copy(
++    entries = 0x08FD0510L, frontPics = 0x08BEDDD4L, palettes = 0x08BE5D40L, speciesInfo = 0x08C192DCL,
++    speciesToNational = 0x08C150BCL, abilityNames = 0x08C0B11CL, footprints = 0x08FD39D4L, regionalOrder = 0x08C15524L,
++    evoLayout = EvoLayout(EvoScheme.EPSILON_EMERALD, table = 0x08C2966EL, perMon = 7, record = 6),
++    levelUpLearnsets = 0x08C2F320L,
++)
++
+ /**
+  * Super Mariomon v1.5.1-Anniversary: vanilla-shaped tables (an old pokeemerald-expansion's), the
+  * Mario species from 906 numbered 1..155 (sSpeciesToNationalPokedexNum: PIRANHA P. 906 = No.1,
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/Poller.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/Poller.kt
 index 5a7a387..66f19ae 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/companion/data/Poller.kt
@@ -132,52 +174,57 @@ index 5a7a387..66f19ae 100644
              MARIOMON_V1_5_2_Anniversary_SHA1,
              GS_CHRONICLES_V2_7_6_SHA1,
 diff --git a/docs/DEVELOPMENT.md b/docs/DEVELOPMENT.md
-index 3ecd02d..ba2ca8d 100644
+index 3ecd02d..169a92c 100644
 --- a/docs/DEVELOPMENT.md
 +++ b/docs/DEVELOPMENT.md
-@@ -421,6 +421,15 @@ but it is its map:
+@@ -421,6 +421,19 @@ but it is its map:
  - **Not done**: DEX and GUIDE (its learnsets and base stats also follow the save: MODERN MOVES, NEW STATS), EXPAND, the field
    reads and field items, FLY, PC anywhere, the CARD, shiny odds.
  
 +**Pokémon Epsilon Emerald v1.0.3** (`NATIVE_EPSILON_EMERALD_V1_0_3`, 2026-11-21, partial): the same hack rebuilt (sha1 `fec5d319...`).
-+Its RAM is 1.0.0's (read live on a v1.0.3 save with a headless mGBA), its ROM moved by a different amount per region, so every
-+ROM address needs finding again: gItems `0x08FEECA4` (+0x86C), the icon tables from the GF header (+0x86C; gMonPaletteTable
-+`0x08BE5D40`, +0x680), gScriptCmdTable `0x08A49C98` (+0x750). `scripts/gen_epsilon_emerald_tables.py` run on it gives the same tables as
-+1.0.0 (541 species, 828 moves, 608 items), so `EpsilonEmeraldGen.kt` is shared. Functions can be found again by the CRC32 of their
++Its RAM is 1.0.0's (party, save blocks, gMain, bag, dex flags read live on a v1.0.3 save with a headless mGBA), its ROM moved by a
++different amount per region, so each ROM address was found again by its content: gItems `0x08FEECA4` and the icon tables (+0x86C),
++gMonPaletteTable `0x08BE5D40` and the type chart (+0x680), gScriptCmdTable `0x08A49C98` (+0x750), the dex tables
++(`POKEDEX_EPSILON_EMERALD_V1_0_3`: entries +0x86C, base stats +0x684, the species / ability / regional tables +0x680, the
++evolution and level-up tables +0x6A0, the footprints a pointer table named by the literal pool at 0x088F3B58). The five battle
++handlers are 1.0.0's +0x10, each found by its prologue and a literal pool naming the same RAM (gMain, the cursors, gBattleStruct,
++gBattleTypeFlags, gBattlerControllerFuncs), not yet seen in a played v1.0.3 battle. `scripts/gen_epsilon_emerald_tables.py` run on
++it gives the same tables as 1.0.0, so `EpsilonEmeraldGen.kt` is shared. Functions can also be found again by the CRC32 of their
 +first 32 bytes (the guards' own): varGet / varSet / flagGet / fadeScreen +0x60, lockControls / unlockControls / fieldControlsLocked /
-+ScriptContext_SetupScript +0x48, SetUpFieldMoveFly's toMapWarp +0x14; GetMonData, SetMonData, the PC function, SetUpFieldMoveFly,
-+GetMapsecType, the heal / return warps and the five battle handlers changed and are still open, as are the dex / HERE tables.
++ScriptContext_SetupScript +0x48, toMapWarp +0x14. Still open: GetMonData, SetMonData, the PC function, SetUpFieldMoveFly,
++GetMapsecType, the heal / return warps (PC anywhere, FLY), the HERE tables and WIDE.
 +
  **Pokémon Epsilon Emerald** (pokemerrp's; v1.0.0, `NATIVE_EPSILON_EMERALD`, 2026-11-15): a closed gcc pokeemerald on
  Emerald's species and item ids (its own species from 412: Roserade ... Obstagoon, the egg 446, forms after; its own items from
  377) with an older pokeemerald-expansion battle engine (the expansion's move ids to 828, Fairy as type 18, a 19 x 19 uq4.12
 diff --git a/docs/ROM_FEATURES.md b/docs/ROM_FEATURES.md
-index b89db61..1aacfd7 100644
+index b89db61..c3aca87 100644
 --- a/docs/ROM_FEATURES.md
 +++ b/docs/ROM_FEATURES.md
 @@ -96,6 +96,7 @@ change to any of the places listed under "Where it's decided" updates its rows h
  | Lazarus | 2.0 | ✅ | ✅ | ✅ | ✅ | — | ✅ ³⁴ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ ¹⁹ | — | ✅ ³³ | ✅ |
  | Modern Emerald | 3.6 | — | ✅ | ✅ | ✅ | — | — | — | — | — | — | — | — | — | — | — | — | ✅ |
  | Epsilon Emerald | 1.0.0 | ✅ ³⁹ | ✅ | ✅ | ✅ | — | ✅ ³⁹ | — | ✅ ³⁹ | — | ✅ ³⁹ | ✅ ³⁹ | — | — | — | — | — | — |
-+| Epsilon Emerald | 1.0.3 | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — ⁵⁸ |
++| Epsilon Emerald | 1.0.3 | — | ◐ ⁵⁸ | ◐ ⁵⁸ | ◐ ⁵⁸ | — | — | — | — | — | — | — | — | — | — | — | — | — |
  | Monomyth | 1.0, 1.1, 1.2 | ✅ ²³ | ✅ | ✅ | ✅ | — | — | — | ✅ ²³ | — | — ²³ | ✅ ²³ | — | — | — | — | — | ✅ |
  | Odyssey | 4.1.1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ ³⁴ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ ¹⁹ | ✅ | ✅ ³³ | ✅ |
  | Orange Islands | Beta 5.7, an older beta | ◐ ³ | ✅ | ✅ | ✅ | ✅ | ✅ ³⁴ | — | ✅ | ✅ | ✅ | ✅ | ✅ ¹⁵ | — | ✅ ¹⁹ ²⁰ | ✅ | ✅ ³³ | ✅ |
-@@ -1054,3 +1055,9 @@ Hacks that are not in the table have no DEX, CARD or GUIDE yet. The MAP tab draw
+@@ -1054,3 +1055,10 @@ Hacks that are not in the table have no DEX, CARD or GUIDE yet. The MAP tab draw
      Italian Yellow and Crystal Legacy (not played); N/A in the Spanish / German / French Yellows (12 to 14 bytes of bank 0
      padding for a 16-byte trampoline), Brown, PureRed / PureBlue, Yellow Legacy, Crystal Clear (1 byte), Prism (27 bytes,
      under the 64 kept) and Polished Crystal (no .GetDPad). `GbRunningShoesTest`.
 +58. Epsilon Emerald 1.0.3 (a rebuilt ROM, sha1 fec5d319…; 2026-11-21) is a partial port (`NATIVE_EPSILON_EMERALD_V1_0_3`): its code
-+    and data moved (gItems and the icon tables +0x86C, gMonPaletteTable and the type chart +0x680, gScriptCmdTable +0x750,
-+    the field-control functions +0x48, the var / flag functions +0x60), its RAM did not (party, save blocks, gMain, map header, object
-+    events and the bag read live on a v1.0.3 save, headless). What works is what needs only that: the party, the bag, money, the
-+    icons and the item names. Every row above is "no" until its ROM addresses are found: the battle menu handlers and cursors,
-+    the Pokédex / HERE tables, PC anywhere, FLY and WIDE. The battle RAM is 1.0.0's, not checked on 1.0.3.
++    and data moved by a different amount per region, its RAM did not (party, save blocks, gMain, map header, object events, the
++    bag and the dex flags read live on a v1.0.3 save, headless). Working from that: the party, bag, money, icons, item names,
++    and the DEX (`POKEDEX_EPSILON_EMERALD_V1_0_3`, each table found by its content: BULBASAUR's page, base stats, evolution row and
++    level-up list; the save's Torchic is owned and seen). The BATTLE buttons, one-press picks and the POKéMON switch are 1.0.0's five
++    handlers +0x10, each found by its prologue and a literal pool naming the same RAM as 1.0.0's; no v1.0.3 battle has been played
++    yet, so they stay ◐ until one is. Not found: the HERE tables, PC anywhere, FLY and WIDE (the rows above are "no").
 diff --git a/gamedata/gen3/hacks/epsilon_emerald.toml b/gamedata/gen3/hacks/epsilon_emerald.toml
-index e80869c..d54f8a8 100644
+index e80869c..11e31fe 100644
 --- a/gamedata/gen3/hacks/epsilon_emerald.toml
 +++ b/gamedata/gen3/hacks/epsilon_emerald.toml
-@@ -73,3 +73,50 @@ partyMenu = 0x0203DE3C
+@@ -73,3 +73,63 @@ partyMenu = 0x0203DE3C
  pokedex = 'POKEDEX_EPSILON_EMERALD'
  guideTables = 'GUIDE_TABLES_EPSILON_EMERALD'
  fieldItems = 'FIELD_ITEMS_EPSILON_EMERALD'
@@ -196,9 +243,10 @@ index e80869c..d54f8a8 100644
 +# - ROM: gItems 0x08FEECA4 (found from "Master Ball" and a 36-byte stride; the GF header's gItems is the same), the icon
 +# tables from the GF header (0x08000138, 0x08000140) and the literal pool words that name them, gMonPaletteTable 0x08BE5D40
 +# (header 0x08000130).
-+# NOT in this config (the addresses weren't found yet, so nothing reads them): the battle menu handlers and cursors (touch
-+# battle control, one-press picks), the Pokédex / HERE tables, PC anywhere and FLY, and WIDE. The battle RAM below is 1.0.0's
-+# and not checked on 1.0.3: a battle's panel is the first thing to look at when this goes on a device.
++# The battle menu handlers are 1.0.0's +0x10: each found by its prologue and a literal pool naming the same gMain, cursor,
++# gBattleStruct, gBattleTypeFlags and gBattlerControllerFuncs RAM as in 1.0.0 (so that RAM is 1.0.0's too).
++# The Pokédex tables (POKEDEX_EPSILON_EMERALD_V1_0_3, Pokedex.kt) were each found by their content.
++# NOT in this config (the addresses weren't found yet, so nothing reads them): the HERE tables, PC anywhere and FLY, and WIDE.
 +[config.epsilon_emerald_v1_0_3]
 +itemDescs = { base = 0x08FEECA4, stride = 36, descOff = 0x14, count = 629 }
 +playerParty = 0x020251A0
@@ -228,3 +276,15 @@ index e80869c..d54f8a8 100644
 +eggSpecies = 446
 +itemIconTable = 0x090A38B8
 +enemyParty = 0x020253F8
++battlerControllerFuncs = 0x03004520
++handleInputChooseAction = 0x08875869
++handleInputChooseMove = 0x088762F9
++completeWhenChoseItem = 0x088783E1
++waitForMonSelection = 0x08878325
++handleInputChooseTarget = 0x08875B95
++battlerPartyIndexes = 0x02024C3A
++battleStructPtr = 0x02025100
++actionCursor = 0x02025110
++moveCursor = 0x02025114
++partyMenu = 0x0203DE3C
++pokedex = 'POKEDEX_EPSILON_EMERALD_V1_0_3'

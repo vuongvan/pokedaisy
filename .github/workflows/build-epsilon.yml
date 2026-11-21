@@ -1,4 +1,4 @@
-name: Build Epsilon 1.0.3 APK
+name: Build Pokedasiy
 
 on:
   workflow_dispatch:
@@ -42,13 +42,7 @@ jobs:
         run: python3 scripts/gen_gamedata.py --check
 
       - name: Debug APK
-        env:
-         RELEASE_STORE_FILE: ${{ github.workspace }}/cleantv-release.jks
-         RELEASE_STORE_PASSWORD: testpass123
-         RELEASE_KEY_ALIAS: testkey
-         RELEASE_KEY_PASSWORD: testpass123
-        
-        run: ./gradlew assembleRelease --stacktrace
+        run: ./gradlew :app:assembleDebug --stacktrace
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

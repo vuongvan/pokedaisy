@@ -15,7 +15,7 @@ jobs:
 
       - name: Apply the Epsilon v1.0.3 patch
         run: |
-          git apply --check patches/epsilon_v1_0_3_support.patch
+          git apply --check patches/pokedaisy_update.patch
           git apply patches/pokedaisy_update.patch
 
       - name: Native dependencies

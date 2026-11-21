@@ -47,7 +47,7 @@ jobs:
          RELEASE_STORE_PASSWORD: testpass123
          RELEASE_KEY_ALIAS: testkey
          RELEASE_KEY_PASSWORD: testpass123
-        working-directory: launcher
+        
         run: ./gradlew :app:assembleDebug --stacktrace
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

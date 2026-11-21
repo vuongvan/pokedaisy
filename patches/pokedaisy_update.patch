@@ -1,3 +1,88 @@
+diff --git a/app/src/main/cpp/pk_api.h b/app/src/main/cpp/pk_api.h
+index 4d9a791..24bde75 100644
+--- a/app/src/main/cpp/pk_api.h
++++ b/app/src/main/cpp/pk_api.h
+@@ -33,6 +33,9 @@ enum {
+ /** Starts the game at [romPath] (a .gba, .gb or .gbc), any game before it closed first. [savePath] (may be NULL) is
+  * its battery save, created if missing and written as the game saves; a file it can't write still loads. */
+ bool pk_api_init(const char* romPath, const char* savePath);
++/** The GBA BIOS file the next pk_api_init boots through (a real console's start: the logo first), or NULL / "" for mGBA's built-in
++ * one (the game starts at once). Used by a Game Boy Advance game only. Kept until changed. */
++void pk_api_set_bios(const char* path);
+ /** Closes the game: its save written and closed, everything it held freed. Nothing up = nothing to do. */
+ void pk_api_deinit(void);
+ /** PK_API_PLATFORM_GBA / _GB, or _NONE with no game up. */
+diff --git a/app/src/main/cpp/pk_session.c b/app/src/main/cpp/pk_session.c
+index b84aa2a..41f9fa6 100644
+--- a/app/src/main/cpp/pk_session.c
++++ b/app/src/main/cpp/pk_session.c
+@@ -223,6 +223,13 @@ struct mCore* pkMainCore(void) {
+     return g.core;
+ }
+ 
++static char pkBiosPath[1024];
++
++void pk_api_set_bios(const char* path) {
++    if (path && path[0] && strlen(path) < sizeof(pkBiosPath)) strcpy(pkBiosPath, path);
++    else pkBiosPath[0] = '\0';
++}
++
+ bool pk_api_init(const char* romPath, const char* savePath) {
+     if (g.core) {
+         pk_api_deinit();
+@@ -296,6 +303,20 @@ bool pk_api_init(const char* romPath, const char* savePath) {
+         }
+     }
+ 
++    // A real GBA BIOS (the player's own file), when asked for: mGBA then runs the console's start-up, the logo and its
++    // sound, instead of its built-in BIOS jumping straight to the game. A file that isn't a GBA BIOS (GBAIsBIOS)
++    // is refused by the core: the game starts the usual way.
++    if (pkBiosPath[0] && pk_is_gba(core)) {
++        struct VFile* bios = VFileOpen(pkBiosPath, O_RDONLY);
++        if (bios && core->loadBIOS(core, bios, 0)) {
++            core->opts.skipBios = false;
++            LOGI("booting through the BIOS file %s", pkBiosPath);
++        } else {
++            if (bios) bios->close(bios);
++            LOGE("BIOS file not usable, starting without it: %s", pkBiosPath);
++        }
++    }
++
+     core->reset(core);
+     bool perf = pkPerfOn();
+     pk_idle_detect(core, perf);   // the game's wait for VBlank skipped, not run (pk_perf.h)
+diff --git a/app/src/main/cpp/pokedaisy_jni.c b/app/src/main/cpp/pokedaisy_jni.c
+index c41a6ef..7dd0589 100644
+--- a/app/src/main/cpp/pokedaisy_jni.c
++++ b/app/src/main/cpp/pokedaisy_jni.c
+@@ -129,6 +129,14 @@ Java_com_pokedaisy_app_MgbaCore_pkInit(JNIEnv* env, jobject thiz,
+     return ok ? JNI_TRUE : JNI_FALSE;
+ }
+ 
++/** The GBA BIOS file for the next pkInit (null = mGBA's built-in one). */
++JNIEXPORT void JNICALL
++Java_com_pokedaisy_app_MgbaCore_pkSetBios(JNIEnv* env, jobject thiz, jstring jPath) {
++    const char* path = jPath ? (*env)->GetStringUTFChars(env, jPath, NULL) : NULL;
++    pk_api_set_bios(path);
++    if (path) (*env)->ReleaseStringUTFChars(env, jPath, path);
++}
++
+ JNIEXPORT void JNICALL
+ Java_com_pokedaisy_app_MgbaCore_pkDeinit(JNIEnv* env, jobject thiz) {
+     pkTeardown();
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/EmulatorEngine.kt b/app/src/main/kotlin/com/pokedaisy/app/EmulatorEngine.kt
+index d596ba9..9f77170 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/EmulatorEngine.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/EmulatorEngine.kt
+@@ -1042,6 +1042,8 @@ class EmulatorEngine(
+         }
+         ndsScaleSet = -1
+         MgbaCore.pkNdsSetCore(ndsCore)
++        // The player's GBA BIOS file, when GBA BIOS is on (Settings > FOLDERS): the game starts through it. A Game Boy or DS game ignores it.
++        MgbaCore.pkSetBios(preferences.gbaBiosPath?.takeIf { preferences.gbaBiosOn && java.io.File(it).isFile })
+         if (!MgbaCore.pkInit(rom.absolutePath, save.absolutePath)) {
+             loadError = "mGBA could not load ${rom.name}"
+             gameSession.close()
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/GameTitles.kt b/app/src/main/kotlin/com/pokedaisy/app/GameTitles.kt
 index ba463e1..0459caa 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/GameTitles.kt
@@ -10,6 +95,102 @@ index ba463e1..0459caa 100644
          "5b38a681b6924ef3e0bb9f6cfbf22426c4c4e523" to "Pokémon Elite Redux",
          "2f3e17e55c6afe23da97ec0f96a067eeb142ad15" to "Pokémon Elite Redux",
          "40780347d0b4df6bf491eaf12603e5422caee677" to "Pokémon Team Rocket Edition: Dragonsden Version",
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt b/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt
+index 6a0051e..9f278a3 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt
+@@ -17,6 +17,8 @@ object MgbaCore {
+ 
+     /** Loads [romPath], attaches [savePath] as persistent SRAM, resets. */
+     external fun pkInit(romPath: String, savePath: String?): Boolean
++    /** The GBA BIOS file the next [pkInit] of a GBA game boots through (null: mGBA's built-in one). */
++    external fun pkSetBios(path: String?)
+     external fun pkDeinit()
+ 
+     /** Direct buffer over the native RGBA8888 framebuffer, [pkVideoWidth] x [pkVideoHeight]. */
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt b/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt
+index 771ad54..f0e3614 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt
+@@ -874,6 +874,16 @@ class Prefs(
+         get() = p.getString("extra_save_dirs", null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty()
+         set(v) = p.edit().putString("extra_save_dirs", v.distinct().joinToString("\n")).apply()
+ 
++    /** Settings > FOLDERS > GBA BIOS: the player's BIOS file ([GbaBios]); null = none picked. */
++    var gbaBiosPath: String?
++        get() = p.getString("gba_bios_path", null)
++        set(v) = p.edit().putString("gba_bios_path", v).apply()
++
++    /** GBA BIOS on: a Game Boy Advance game starts through the BIOS file (the logo first). Off by default, even with a file. */
++    var gbaBiosOn: Boolean
++        get() = p.getBoolean("gba_bios_on", false)
++        set(v) = p.edit().putBoolean("gba_bios_on", v).apply()
++
+     /** Settings > FOLDERS > SAVE BACKUPS: a backup of the save each time a game starts ([SaveBackups]). */
+     var saveBackups: Boolean
+         get() = p.getBoolean("save_backups", true)
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/SettingsActivity.kt b/app/src/main/kotlin/com/pokedaisy/app/SettingsActivity.kt
+index 580baa0..291fe54 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/SettingsActivity.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/SettingsActivity.kt
+@@ -1221,6 +1221,27 @@ class SettingsActivity : ComponentActivity() {
+     /** TOUCH CONTROLS > SKINS: the imported Delta skins, their pick-lists, IMPORT SKIN's file picker. */
+     private val skinStore by lazy { com.pokedaisy.app.companion.DeltaSkinStore(filesDir.toOkioPath() / "skins") }
+     private val touchSkinUi = com.pokedaisy.app.companion.ui.TouchSkinUi()
++    /** GBA BIOS: the picked BIOS file, copied into files/bios/ ([GbaBios]) and turned on; a notice says what happened. */
++    private val pickBios = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
++        if (uri == null) return@registerForActivityResult
++        Thread {
++            val result = GbaBios.import(this, uri)
++            runOnUiThread {
++                if (result.path != null) {
++                    prefs.gbaBiosPath = result.path
++                    prefs.gbaBiosOn = true
++                }
++                val text = when {
++                    result.path == null -> tr(result.problem ?: "That file couldn't be used.")
++                    result.official -> tr("GBA BIOS added and on. New GBA games start with the logo.")
++                    else -> tr("GBA BIOS added and on. It isn't the usual retail file, but it looks like a GBA BIOS.")
++                }
++                android.widget.Toast.makeText(this, text, android.widget.Toast.LENGTH_LONG).show()
++                folderTick++
++            }
++        }.start()
++    }
++
+     private val pickSkin = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { importSkin(it) } }
+ 
+     /** IMPORT SKIN: the picked .deltaskin (or a zip of them) into files/skins/; one new skin is picked for its system. */
+@@ -1944,6 +1965,7 @@ class SettingsActivity : ComponentActivity() {
+         val roms = prefs.romsFolders
+         val extra = prefs.extraSaveDirs
+         val states = statesDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
++        val biosPath = prefs.gbaBiosPath?.takeIf { java.io.File(it).isFile }
+         return listOf(
+             SettingRow(
+                 tk("ROMS FOLDERS"), if (roms.isEmpty()) tk("NONE") else roms.size.toString(), opensPage = true,
+@@ -1961,7 +1983,20 @@ class SettingsActivity : ComponentActivity() {
+                 labelBadge = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.SAVE_BACKUPS),
+             ) { screen = Screen.BACKUPS },
+             SettingRow(tk("SAVE STATES"), humanSize(states), opensPage = true) { screen = Screen.STATES_FOLDER },
+-        )
++            SettingRow(
++                tk("GBA BIOS"), when { biosPath == null -> tk("NONE"); prefs.gbaBiosOn -> tk("ON"); else -> tk("OFF") },
++                subtitle = if (biosPath == null) "Pick your own GBA BIOS file: games then start with the console's logo" else "Tap to turn it on or off",
++            ) {
++                if (biosPath == null) pickBios.launch(arrayOf("*/*"))
++                else { prefs.gbaBiosOn = !prefs.gbaBiosOn; folderTick++ }
++            },
++            if (biosPath != null) SettingRow(tk("REMOVE BIOS"), null, subtitle = "Forget the BIOS file (your own copy stays where it was)") {
++                GbaBios.remove(this)
++                prefs.gbaBiosPath = null
++                prefs.gbaBiosOn = false
++                folderTick++
++            } else null,
++        ).filterNotNull()
+     }
+ 
+     private val statesDir by lazy { File(getExternalFilesDir(null), "states").apply { mkdirs() } }
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/GameOptions.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/GameOptions.kt
 index 4a88b91..2174594 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/companion/GameOptions.kt
@@ -281,6 +462,31 @@ index 5a7a387..66f19ae 100644
              MARIOMON_V1_2_1_SHA1, MARIOMON_V1_2_2_SHA1, MARIOMON_V1_3_SHA1, MARIOMON_V1_5_1_Anniversary_SHA1,
              MARIOMON_V1_5_2_Anniversary_SHA1,
              GS_CHRONICLES_V2_7_6_SHA1,
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt
+index e14a553..fdb7fc7 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt
+@@ -757,4 +757,8 @@ internal val trSettings: Map<String, Tr> = mapOf(
+     "The group buttons beside this list" to Tr(ja = "この リストの よこの グループ ボタン", fr = "Les boutons de groupe à côté de la liste", de = "Die Gruppenknöpfe neben dieser Liste", it = "I pulsanti dei gruppi accanto alla lista", es = "Los botones de grupo junto a esta lista", br = "Os botões de grupo ao lado desta lista", pt = "Os botões de grupo ao lado desta lista", ko = "이 목록 옆의 그룹 버튼"),
+     "LEVEL CAP" to Tr(ja = "レベルじょうげん", fr = "NIVEAU MAX", de = "LEVEL-GRENZE", it = "LIVELLO MAX", es = "NIVEL MÁXIMO", br = "NÍVEL MÁXIMO", pt = "NÍVEL MÁXIMO", ko = "레벨 제한"),
+     "Stops at the next boss's top level" to Tr(ja = "つぎの ボスの いちばん たかい レベルで とまる", fr = "S'arrête au niveau max du prochain boss", de = "Stoppt beim höchsten Level des nächsten Bosses", it = "Si ferma al livello più alto del prossimo boss", es = "Se detiene en el nivel más alto del próximo jefe", br = "Para no nível mais alto do próximo chefe", pt = "Para no nível mais alto do próximo chefe", ko = "다음 보스의 최고 레벨에서 멈춰요"),
++    "GBA BIOS" to Tr(ja = "GBA BIOS", fr = "BIOS GBA", de = "GBA-BIOS", it = "BIOS GBA", es = "BIOS DE GBA", br = "BIOS DO GBA", pt = "BIOS DO GBA", ko = "GBA BIOS"),
++    "REMOVE BIOS" to Tr(ja = "BIOSを けす", fr = "RETIRER LE BIOS", de = "BIOS ENTFERNEN", it = "RIMUOVI BIOS", es = "QUITAR BIOS", br = "REMOVER BIOS", pt = "REMOVER BIOS", ko = "BIOS 삭제"),
++    "GBA BIOS added and on. New GBA games start with the logo." to Tr(ja = "GBA BIOSを ついかして オンに しました。 あたらしい GBAゲームは ロゴから はじまります。", fr = "BIOS GBA ajouté et activé. Les nouveaux jeux GBA démarrent avec le logo.", de = "GBA-BIOS hinzugefügt und aktiviert. Neue GBA-Spiele starten mit dem Logo.", it = "BIOS GBA aggiunto e attivato. I nuovi giochi GBA partono con il logo.", es = "BIOS de GBA añadido y activado. Los juegos de GBA nuevos empiezan con el logo.", br = "BIOS do GBA adicionada e ativada. Novos jogos de GBA começam com o logo.", pt = "BIOS do GBA adicionada e ativada. Os novos jogos GBA começam com o logo.", ko = "GBA BIOS를 추가하고 켰습니다. 새 GBA 게임은 로고와 함께 시작됩니다."),
++    "GBA BIOS added and on. It isn't the usual retail file, but it looks like a GBA BIOS." to Tr(ja = "GBA BIOSを ついかして オンに しました。 ふつうの せいひんばんの ファイルでは ありませんが、 GBA BIOSに みえます。", fr = "BIOS GBA ajouté et activé. Ce n'est pas le fichier commercial habituel, mais il ressemble à un BIOS GBA.", de = "GBA-BIOS hinzugefügt und aktiviert. Es ist nicht die übliche Handelsversion, sieht aber wie ein GBA-BIOS aus.", it = "BIOS GBA aggiunto e attivato. Non è il solito file commerciale, ma sembra un BIOS GBA.", es = "BIOS de GBA añadido y activado. No es el archivo comercial habitual, pero parece un BIOS de GBA.", br = "BIOS do GBA adicionada e ativada. Não é o arquivo comercial usual, mas parece uma BIOS de GBA.", pt = "BIOS do GBA adicionada e ativada. Não é o ficheiro comercial habitual, mas parece uma BIOS de GBA.", ko = "GBA BIOS를 추가하고 켰습니다. 일반 정식 파일은 아니지만 GBA BIOS처럼 보입니다."),
+ )
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/SettingRows.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/SettingRows.kt
+index 7372d56..4aa4935 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/SettingRows.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/SettingRows.kt
+@@ -127,6 +127,7 @@ val SETTING_KEYWORDS: Map<String, String> = mapOf(
+     "LOOK" to "style appearance glass solid outline console window touch controls buttons hud",
+     "COLORS" to "touch controls buttons colours color theme dark light indigo glacier spice kiwi fuchsia retro primary",
+     "GBA SKIN" to "touch controls skin skins deltaskin delta controller picture",
++    "GBA BIOS" to "bios boot logo startup intro nintendo gba_bios.bin real console start screen",
+     "IMPORT SKIN" to "touch controls skin skins deltaskin delta add install controller picture",
+     "GAME BUTTONS" to "key bindings keybinds keybinding controls remap remapping rebind mapping input controller gamepad buttons turbo start 2 select 2 x y ds nds game boy gba to companion d-pad dpad directions up down left right arrows 8bitdo micro keyboard mode",
+     "HOTKEYS" to "shortcuts combos save state load state slot rewind fast forward key bindings restart close quit exit app companion open panel window",
 diff --git a/docs/DEVELOPMENT.md b/docs/DEVELOPMENT.md
 index 3ecd02d..169a92c 100644
 --- a/docs/DEVELOPMENT.md
@@ -357,6 +563,19 @@ index 4dd0a90..95d7777 100644
  
  ## STATS: IVs, EVs, nature and ability
  
+diff --git a/docs/manual/settings-reference.md b/docs/manual/settings-reference.md
+index 42b9bb1..820e9a5 100644
+--- a/docs/manual/settings-reference.md
++++ b/docs/manual/settings-reference.md
+@@ -105,7 +105,7 @@ The `SHADERS` page:
+ | `SUPPORTED ONLY` | `ON`, **`OFF`** | Leaves games the companion can't read out of the library. Your files stay where they are. | [Library](library.md) |
+ | `DUAL-SCREEN LAUNCHER` | **`ON`**, `OFF` | With two screens, the library shows the game list on one and the selected game's media on the other. Off, the plain library. | [Library](library.md#the-dual-screen-launcher) |
+ | `COVER ART` | `ON` once a key is saved, else **`OFF`** (a page) | Your own free keys for RetroAchievements box art and SteamGridDB icons (`GET KEY` opens the page to make one). `REPLACE ALL` fetches every cover again. | [Library](library.md) |
+-| `FOLDERS` | a page | A page for each: `ROMS FOLDERS`, your linked ROMs folders (`ADD FOLDER`, `RESCAN`, `REMOVE`); `GAME SAVES`, the folder saves go to (`CHANGE FOLDER`, `USE DEFAULT`); `ALSO LOOK IN`, other emulators' save folders; `SAVE BACKUPS`, the backup taken each time a game starts (`BACKUPS` on or off, `KEEP PER GAME`, and a folder for all of them); `SAVE STATES`, where save states are kept. | [Library](library.md), [Saves](saves.md) |
++| `FOLDERS` | a page | A page for each: `ROMS FOLDERS`, your linked ROMs folders (`ADD FOLDER`, `RESCAN`, `REMOVE`); `GAME SAVES`, the folder saves go to (`CHANGE FOLDER`, `USE DEFAULT`); `ALSO LOOK IN`, other emulators' save folders; `SAVE BACKUPS`, the backup taken each time a game starts (`BACKUPS` on or off, `KEEP PER GAME`, and a folder for all of them); `SAVE STATES`, where save states are kept; `GBA BIOS`, your own GBA BIOS file (16 KB, the one named gba_bios.bin): pick it once and Game Boy Advance games start through it, the console's logo and sound first, then the game (tap the row to turn it on or off, `REMOVE BIOS` to forget it; PokeDaisy has none of its own, and without one the games start at once as before; Game Boy and DS games ignore it). | [Library](library.md), [Saves](saves.md) |
+ | `HIDDEN GAMES` | **`NONE`**, or how many | Games you hid from the library with `HIDE`. Tap one to `SHOW` it again, or `SHOW ALL`. | [Library](library.md) |
+ | `CHEATS` | `ON`, **`OFF`** (a page) | The master switch for cheat codes, and each game's codes: `ADD CODE`, `IMPORT FILE`, `REMOVE`. | [Cheats](cheats.md) |
+ 
 diff --git a/gamedata/gen3/hacks/epsilon_emerald.toml b/gamedata/gen3/hacks/epsilon_emerald.toml
 index e80869c..11e31fe 100644
 --- a/gamedata/gen3/hacks/epsilon_emerald.toml
@@ -425,4 +644,3 @@ index e80869c..11e31fe 100644
 +moveCursor = 0x02025114
 +partyMenu = 0x0203DE3C
 +pokedex = 'POKEDEX_EPSILON_EMERALD_V1_0_3'
-

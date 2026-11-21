@@ -426,13 +426,3 @@ index e80869c..11e31fe 100644
 +partyMenu = 0x0203DE3C
 +pokedex = 'POKEDEX_EPSILON_EMERALD_V1_0_3'
 
-diff --git a/app/build.gradle.kts b/app/build.gradle.kts
---- a/app/build.gradle.kts
-+++ b/app/build.gradle.kts
-@@ -88,7 +88,7 @@ android {
-     ndkVersion = "28.2.13676358"
-
-     defaultConfig {
--        applicationId = "com.pokedaisy.app"
-+        applicationId = "com.pokedaisy.app2"
-         minSdk = 26

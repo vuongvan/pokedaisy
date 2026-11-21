@@ -434,5 +434,5 @@ diff --git a/app/build.gradle.kts b/app/build.gradle.kts
 
      defaultConfig {
 -        applicationId = "com.pokedaisy.app"
-+        applicationId = "com.phi.cleantv"
++        applicationId = "com.pokedaisy.app2"
          minSdk = 26

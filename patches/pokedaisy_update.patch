@@ -95,6 +95,62 @@ index ba463e1..0459caa 100644
          "5b38a681b6924ef3e0bb9f6cfbf22426c4c4e523" to "Pokémon Elite Redux",
          "2f3e17e55c6afe23da97ec0f96a067eeb142ad15" to "Pokémon Elite Redux",
          "40780347d0b4df6bf491eaf12603e5422caee677" to "Pokémon Team Rocket Edition: Dragonsden Version",
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/GbaBios.kt b/app/src/main/kotlin/com/pokedaisy/app/GbaBios.kt
+new file mode 100644
+index 0000000..eb2b682
+--- /dev/null
++++ b/app/src/main/kotlin/com/pokedaisy/app/GbaBios.kt
+@@ -0,0 +1,50 @@
++package com.pokedaisy.app
++
++import android.content.Context
++import android.net.Uri
++import java.io.File
++import java.security.MessageDigest
++
++/**
++ * The player's own Game Boy Advance BIOS file (Settings > FOLDERS > GBA BIOS): a game then starts through it, the console's
++ * logo and sound first, instead of mGBA's built-in BIOS jumping straight to the game. PokeDaisy ships no BIOS; the file is the
++ * player's, copied to files/bios/ so it stays when the picked document goes. Used by Game Boy Advance games only.
++ */
++object GbaBios {
++    /** A GBA BIOS is 16 KiB. */
++    const val SIZE = 16384
++    /** The retail GBA BIOS (gba_bios.bin); other 16 KiB BIOS files that look right are taken too (the DS's GBA mode one). */
++    const val OFFICIAL_SHA1 = "300c20df6731a33952ded8c436f7f186d25d3492"
++
++    class Imported(val path: String?, val problem: String?, val official: Boolean = false)
++
++    fun file(context: Context): File = File(context.filesDir, "bios/gba_bios.bin")
++
++    /** mGBA's own test (GBAIsBIOS): the first seven words are the exception vectors, each a branch (0xEA) within 16 MiB. */
++    fun looksLikeBios(bytes: ByteArray): Boolean {
++        if (bytes.size != SIZE) return false
++        for (i in 0 until 7) {
++            if (bytes[4 * i + 3] != 0xEA.toByte() || bytes[4 * i + 2] != 0.toByte()) return false
++        }
++        return true
++    }
++
++    /** Copies the picked document in; [Imported.problem] says why not when it isn't a GBA BIOS. */
++    fun import(context: Context, uri: Uri): Imported {
++        val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
++            ?: return Imported(null, "That file couldn't be opened.")
++        if (bytes.size != SIZE) return Imported(null, "A GBA BIOS file is exactly 16 KB (16,384 bytes); this one is ${bytes.size} bytes.")
++        if (!looksLikeBios(bytes)) return Imported(null, "That isn't a GBA BIOS file.")
++        val target = file(context)
++        return runCatching {
++            target.parentFile?.mkdirs()
++            target.writeBytes(bytes)
++            val sha1 = MessageDigest.getInstance("SHA-1").digest(bytes).joinToString("") { "%02x".format(it) }
++            Imported(target.absolutePath, null, sha1 == OFFICIAL_SHA1)
++        }.getOrElse { Imported(null, "The file couldn't be saved.") }
++    }
++
++    fun remove(context: Context) {
++        file(context).delete()
++    }
++}
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt b/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt
 index 6a0051e..9f278a3 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt

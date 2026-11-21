@@ -1,0 +1,94 @@
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/CompanionSupport.kt b/app/src/main/kotlin/com/pokedaisy/app/CompanionSupport.kt
+index 8fc5de1..0e2efd2 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/CompanionSupport.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/CompanionSupport.kt
+@@ -80,10 +80,18 @@ object CompanionSupport {
+      * cart's at 0xA0, a Game Boy one's at 0x134, a DS one's at 0). The library lists these as NOT SUPPORTED, playable as
+      * any game; anything else in a linked folder (a whole frontend's other games) stays out. Header reads only.
+      */
++    /**
++     * Any Game Boy Advance, Game Boy or DS game joins the library, not only Pokémon ones: a game the second screen can't read
++     * is listed NOT SUPPORTED and plays like any other (the emulator needs nothing of the companion). What makes a ROM is its
++     * cart header ([RomIdentity.looksLikeRom]), so a stray `.bin` of another console still stays out. false = Pokémon games only.
++     */
++    const val ANY_GAME = true
++
+     fun looksPokemon(rom: File): Boolean {
+         // An archive with no GBA / Game Boy / DS ROM in it (a zipped N64 Pokemon Snap) is nothing the app plays, whatever
+         // its name: it was listed under GBA, NOT SUPPORTED.
+         if (RomArchive.isArchive(rom) && RomArchive.romEntry(rom) == null) return false
++        if (ANY_GAME && RomIdentity.looksLikeRom(rom)) return true
+         if (POKEMON_NAME.containsMatchIn(rom.name)) return true
+         val title = when {
+             RomIdentity.isGameBoy(rom) -> RomArchive.readAt(rom, 0x134L, 16)
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/LibraryActivity.kt b/app/src/main/kotlin/com/pokedaisy/app/LibraryActivity.kt
+index 06e9f7f..f2fb435 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/LibraryActivity.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/LibraryActivity.kt
+@@ -1480,7 +1480,7 @@ class LibraryActivity : ComponentActivity() {
+                 null
+             } ?: return@Thread
+             val supported = CompanionSupport.isSupported(pending.tmp)
+-            runOnUiThread { if (supported) finishImport(pending) else pendingImport = pending }
++            runOnUiThread { if (supported || CompanionSupport.ANY_GAME) finishImport(pending) else pendingImport = pending }
+         }, "pokedaisy-import").apply { isDaemon = true; start() }
+     }
+ 
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/RomFolder.kt b/app/src/main/kotlin/com/pokedaisy/app/RomFolder.kt
+index afa60b9..ac00e67 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/RomFolder.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/RomFolder.kt
+@@ -267,7 +267,7 @@ object RomFolder {
+      * linked before Black was supported stayed out of the library). */
+     private val SUPPORTED = "#supported\t" + Integer.toHexString(
+         // "pokemon": the cache from before unsupported Pokémon games were listed ([Entry.pokemon]) read again once.
+-        (listOf("pokemon") + TelemetrySampler.SUPPORTED_HACK_SHA1S.sorted() + TelemetrySampler.SUPPORTED_GB_SHA1S.sorted() +
++        (listOf("pokemon", "any-game") + TelemetrySampler.SUPPORTED_HACK_SHA1S.sorted() + TelemetrySampler.SUPPORTED_GB_SHA1S.sorted() +
+             com.pokedaisy.app.companion.data.RETAIL_DUMPS.map { it.sha1 } +
+             TelemetrySampler.NDS_GAMES.map { (code, rev) -> "$code:$rev" }.sorted() +
+             com.pokedaisy.app.companion.data.OriginHeartGold.V4_0_3_EN_RC8_SHA1).hashCode(),
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/RomPatchFlow.kt b/app/src/main/kotlin/com/pokedaisy/app/RomPatchFlow.kt
+index 7d6e1a5..f723bd6 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/RomPatchFlow.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/RomPatchFlow.kt
+@@ -162,7 +162,7 @@ class RomPatchFlow(
+             val verdict = runCatching { CompanionSupport.verdict(file) }.getOrDefault(CompanionSupport.Verdict.UNSUPPORTED)
+             val imported = file.absoluteFile.parentFile == importedDir.absoluteFile
+             // The library lists every imported ROM: one the companion can't read stays out (HIDDEN GAMES can show it).
+-            if (imported && verdict == CompanionSupport.Verdict.UNSUPPORTED && !result.existed) {
++            if (imported && verdict == CompanionSupport.Verdict.UNSUPPORTED && !result.existed && !CompanionSupport.ANY_GAME) {
+                 prefs.hiddenRoms = prefs.hiddenRoms + file.absolutePath
+             }
+             RomAdded.record(activity, listOf(file), initial = false)
+@@ -334,7 +334,8 @@ private fun PatchBody(step: RomPatchFlow.Step, m: GbaTextMetrics, small: GbaText
+                     CompanionSupport.Verdict.TRYABLE ->
+                         tr("{0} is in your library. The second screen doesn't know this game yet, but it can try to read it as the game it's built on.", step.label)
+                     CompanionSupport.Verdict.UNSUPPORTED ->
+-                        tr("The second screen doesn't support {0}, so it isn't in your library.", step.label)
++                        if (CompanionSupport.ANY_GAME) tr("{0} is in your library.", step.label)
++                        else tr("The second screen doesn't support {0}, so it isn't in your library.", step.label)
+                 },
+                 small,
+             )
+diff --git a/docs/manual/library.md b/docs/manual/library.md
+index 6044b8c..16ab9f9 100644
+--- a/docs/manual/library.md
++++ b/docs/manual/library.md
+@@ -90,7 +90,7 @@ Games in a linked folder are your own files, so the library never deletes them.
+ 
+ Tap `+` in the header, pick `ADD A ROM FILE` and pick a game file. PokeDaisy copies it into its own games folder and adds it to the library. If the file is zipped, it's unpacked as it's imported.
+ 
+-If the companion can't read the game, you're told it's `NOT SUPPORTED` and asked whether to add it anyway: the game still plays, only the companion won't show its party, map, items or battles.
++If the companion can't read the game (any game that isn't a Pokémon one included), it is added as `NOT SUPPORTED` without asking: the game still plays, only the companion won't show its party, map, items or battles.
+ 
+ ### Copy files into the app's folder
+ 
+@@ -231,7 +231,7 @@ Every game plays, but the companion only reads the games it knows. The library t
+ - `NOT SUPPORTED`: the game plays, and the companion shows a notice instead of its tabs.
+ - `PARTIALLY SUPPORTED`: a ROM PokeDaisy matched to a game it knows. The party, bag, map and battles work, and whatever didn't match is switched off.
+ 
+-From a linked folder, the library lists the supported games and every other Pokémon game it finds, Game Boy and DS ones too, tagged `NOT SUPPORTED`: they play as any game, without the companion. Games that aren't Pokémon games stay out. For an unsupported hack of FireRed, LeafGreen, Emerald, Ruby or Sapphire, PokeDaisy can try to work out which game it's built on. When PokeDaisy can't tell which game a ROM is built on, `INFO` has `PICK A GAME` to tell it, and `FORGET MATCH` to undo a match. [Supported games](supported-games.md) has the full list and explains how matching works.
++From a linked folder, the library lists the supported games and every other Game Boy Advance, Game Boy and DS game it finds, Pokémon or not, tagged `NOT SUPPORTED`: they play as any game, without the companion. A file with no cart header (another console's ROM) stays out. For an unsupported hack of FireRed, LeafGreen, Emerald, Ruby or Sapphire, PokeDaisy can try to work out which game it's built on. When PokeDaisy can't tell which game a ROM is built on, `INFO` has `PICK A GAME` to tell it, and `FORGET MATCH` to undo a match. [Supported games](supported-games.md) has the full list and explains how matching works.
+ 
+ Turn on `SUPPORTED ONLY` in Settings, in the `LIBRARY` group, to leave games the companion can't read out of the library.
+ 

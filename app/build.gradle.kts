@@ -145,12 +145,24 @@ android {
     }
 
     signingConfigs {
-        if (keystoreProps != null) {
-            create("release") {
-                storeFile = file(keystoreProps.getProperty("storeFile"))
-                storePassword = signingSecret("storePassword")
-                keyAlias = keystoreProps.getProperty("keyAlias")
-                keyPassword = signingSecret("keyPassword")
+        release {
+            if (System.getenv("RELEASE_STORE_FILE") != null && file(System.getenv("RELEASE_STORE_FILE")).exists()) {
+                storeFile file(System.getenv("RELEASE_STORE_FILE"))
+                storePassword System.getenv("RELEASE_STORE_PASSWORD")
+                keyAlias System.getenv("RELEASE_KEY_ALIAS")
+                keyPassword System.getenv("RELEASE_KEY_PASSWORD")
+            } else if (rootProject.file("../cleantv-release.jks").exists()) {
+                storeFile rootProject.file("../cleantv-release.jks")
+                storePassword System.getenv("RELEASE_STORE_PASSWORD") ?: "cleantv123"
+                keyAlias System.getenv("RELEASE_KEY_ALIAS") ?: "cleantv"
+                keyPassword System.getenv("RELEASE_KEY_PASSWORD") ?: "cleantv123"
+            } else if (file("cleantv-release.jks").exists()) {
+                storeFile file("cleantv-release.jks")
+                storePassword System.getenv("RELEASE_STORE_PASSWORD") ?: "cleantv123"
+                keyAlias System.getenv("RELEASE_KEY_ALIAS") ?: "cleantv"
+                keyPassword System.getenv("RELEASE_KEY_PASSWORD") ?: "cleantv123"
+            } else {
+                initWith debug
             }
         }
     }
@@ -161,7 +173,7 @@ android {
         create("benchmark") {
             initWith(getByName("debug"))
             isDebuggable = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.release
             matchingFallbacks += listOf("release")
         }
         // A debug build that installs beside the release app (`make install-dev`): its own package id, so its own

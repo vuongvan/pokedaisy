@@ -187,7 +187,7 @@ android {
         }
         release {
             isMinifyEnabled = false
-            if (keystoreProps != null) signingConfig = signingConfigs.getByName("release")
+            signingConfig signingConfigs.release
             // libpokedaisy's symbols, so native crashes (mGBA, the JNI bridge) read as
             // functions, not addresses: `make release` runs uploadCrashlyticsSymbolFileRelease.
             if (crashlytics) (this as ExtensionAware).extensions.configure<CrashlyticsExtension> {

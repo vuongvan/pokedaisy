@@ -1,3 +1,78 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index a6bcc39..b4c6f79 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -109,6 +109,9 @@ android {
+         // 3DS games (Azahar, the n3ds module): only built in with the flag (settings.gradle.kts), off until they ship
+         // (FeatureFlags.n3ds).
+         buildConfigField("boolean", "FEATURE_N3DS", featureFlag("n3ds").toString())
++        // The BananaDS DS core (libpkbananads.so, a second melonDS build): only built in with the flag, off by default
++        // (the build is much faster without it; DsCore.bananaRuns).
++        buildConfigField("boolean", "FEATURE_BANANADS", featureFlag("bananaDs").toString())
+         // Blocked games (BlockedGames) play with everything, tagged BLOCKED: debug builds always, else only with this.
+         buildConfigField("boolean", "FEATURE_ALLOW_BLOCKED", featureFlag("allowBlocked").toString())
+         // ...and `allowBlocked=false` keeps them blocked in a debug build too (to see it as a release does).
+@@ -124,6 +127,12 @@ android {
+                 // mGBA core is C-only, but keep a real STL around in case a
+                 // transitive piece needs it; it's cheap.
+                 arguments += "-DANDROID_STL=c++_shared"
++                arguments += "-DPK_BANANADS=${if (featureFlag("bananaDs")) "ON" else "OFF"}"
++                // ccache for the C / C++ objects (`-Ppokedaisy.ccache=true`, CI): a build after the first only compiles what changed.
++                if (featureFlag("ccache")) {
++                    arguments += "-DCMAKE_C_COMPILER_LAUNCHER=ccache"
++                    arguments += "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
++                }
+                 cFlags += "-O2"
+                 // melonDS (the DS core) is C++: unoptimised, a DS game runs far below full speed even in debug builds.
+                 cppFlags += "-O2"
+@@ -236,7 +245,12 @@ tasks.withType<KotlinCompile>().configureEach {
+ // Settings > LICENSES: NOTICE, then the license text of everything the APK carries, as one asset
+ // (licenses.txt; a line "=== <name>" starts each part).
+ val licensesAsset by tasks.registering {
+-    val parts = listOf(
++    // BananaDS's licenses only when it is built in (its submodules are left out of a build without it).
++    val bananaParts = if (featureFlag("bananaDs")) listOf(
++        "BananaDS - GNU GPL 3.0 or later" to "third_party/bananads/bananads/LICENSE",
++        "melonDS (in BananaDS) - GNU GPL 3.0" to "third_party/melonds-bananads/LICENSE",
++    ) else emptyList()
++    val parts = (listOf(
+         "PokeDaisy (NOTICE)" to "NOTICE",
+         "GNU General Public License v3 (PokeDaisy)" to "LICENSE",
+         "mGBA - Mozilla Public License 2.0" to "third_party/mgba/LICENSE",
+@@ -255,8 +269,6 @@ val licensesAsset by tasks.registering {
+         "miniz (in DSperate) - MIT" to "third_party/dsperate/src/core/cart/miniz/LICENSE",
+         "Noto Sans DSi font table (in DSperate) - SIL Open Font License 1.1" to "third_party/dsperate/src/core/io/dsi_font/LICENSE-NotoSans-OFL-1.1.txt",
+         "WenQuanYi Micro Hei DSi font table (in DSperate) - GNU GPL 3.0 or later with font exception" to "third_party/dsperate/src/core/io/dsi_font/LICENSE-WenQuanYi-MicroHei.txt",
+-        "BananaDS - GNU GPL 3.0 or later" to "third_party/bananads/bananads/LICENSE",
+-        "melonDS (in BananaDS) - GNU GPL 3.0" to "third_party/melonds-bananads/LICENSE",
+         "LCD and Scanlines shaders - MIT" to "third_party/licenses/mGBA-shaders-MIT.txt",
+         "xBR, xBRZ and ScaleFX shaders (libretro glsl-shaders) - MIT, xBRZ also GNU GPL 3.0" to "third_party/licenses/libretro-shaders.txt",
+         "PixelMplus - M+ FONT LICENSE" to "app/src/main/assets/fonts/LICENSE-PixelMplus.txt",
+@@ -267,7 +279,7 @@ val licensesAsset by tasks.registering {
+         "Apache Commons - NOTICE" to "third_party/licenses/Apache-Commons-NOTICE.txt",
+         "XZ for Java - BSD Zero Clause" to "third_party/licenses/XZ-Java-0BSD.txt",
+         "Bouncy Castle (co-op) - MIT" to "third_party/licenses/BouncyCastle-MIT.txt",
+-    ).map { (name, path) -> name to rootProject.file(path) }
++    ) + bananaParts).map { (name, path) -> name to rootProject.file(path) }
+     inputs.files(parts.map { it.second })
+     val out = layout.buildDirectory.file("generated/licenses/licenses.txt")
+     outputs.file(out)
+diff --git a/app/src/main/cpp/CMakeLists.txt b/app/src/main/cpp/CMakeLists.txt
+index 597bb3c..34b596c 100644
+--- a/app/src/main/cpp/CMakeLists.txt
++++ b/app/src/main/cpp/CMakeLists.txt
+@@ -70,7 +70,10 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/nds/dsperate.cmake")
+ # melonDS JIT as BananaDS ships it): other ABIs build no libpkbananads.so, and nds/pk_nds_bnd_load.cpp's dlopen() finds
+ # none, so the core never starts there (DS CORE doesn't offer it: DsCore.bananaRuns).
+ # ---------------------------------------------------------------------------
+-if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
++# Off unless the build asks (`-Ppokedaisy.bananaDs=true`): it is a second melonDS build (BUILD_ALWAYS) and the slowest part of
++# the native build. Without it the DS CORE pick-list doesn't offer BANANADS (DsCore.bananaRuns follows the same flag).
++option(PK_BANANADS "Build the BananaDS core (libpkbananads.so)" OFF)
++if(PK_BANANADS AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+     include(ExternalProject)
+     set(PKB_DIR "${CMAKE_CURRENT_BINARY_DIR}/pkbananads")
+     set(PKB_LIB "${PKB_DIR}/libpkbananads.so")
 diff --git a/app/src/main/cpp/pk_api.h b/app/src/main/cpp/pk_api.h
 index 4d9a791..24bde75 100644
 --- a/app/src/main/cpp/pk_api.h
@@ -152,6 +227,19 @@ index 6a0051e..9f278a3 100644
      external fun pkDeinit()
  
      /** Direct buffer over the native RGBA8888 framebuffer, [pkVideoWidth] x [pkVideoHeight]. */
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/PokeDaisyApp.kt b/app/src/main/kotlin/com/pokedaisy/app/PokeDaisyApp.kt
+index a1dd5e1..7ecd930 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/PokeDaisyApp.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/PokeDaisyApp.kt
+@@ -56,7 +56,7 @@ class PokeDaisyApp : Application() {
+         com.pokedaisy.app.companion.DsCore.deviceWeak = DevicePerformance.looksWeak(this)
+         com.pokedaisy.app.companion.DsCore.is64Bit = android.os.Process.is64Bit()
+         // BananaDS's library is AArch64 only and uses native ELF TLS (Android 10+): offered only where it can start.
+-        com.pokedaisy.app.companion.DsCore.bananaRuns = android.os.Process.is64Bit() &&
++        com.pokedaisy.app.companion.DsCore.bananaRuns = BuildConfig.FEATURE_BANANADS && android.os.Process.is64Bit() &&
+             android.os.Build.SUPPORTED_64_BIT_ABIS.firstOrNull() == "arm64-v8a" && android.os.Build.VERSION.SDK_INT >= 29
+     }
+ }
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt b/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt
 index 771ad54..f0e3614 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt

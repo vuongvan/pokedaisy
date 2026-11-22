@@ -59,7 +59,7 @@ jobs:
         run: python3 scripts/gen_gamedata.py --check
 
       - name: Debug APK
-        run: ./gradlew :app:assembleDebug -Ppokedaisy.ccache=true --stacktrace
+        run: ./gradlew :app:assembleRelease -Ppokedaisy.ccache=true --stacktrace
 
       - name: ccache stats
         if: always()
@@ -68,6 +68,6 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: pokedaisy-epsilon-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14

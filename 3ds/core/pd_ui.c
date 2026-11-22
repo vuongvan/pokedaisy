@@ -92,11 +92,15 @@ int ui_bar_count(const struct pd_ui* ui) {
     return n;
 }
 
+// TAB BAR's rows: only the tabs this game has (GitHub #1346: CHEEVOS, CARD and NUZLOCKE were offered on games without
+// them and never showed). The bits stay per tab, so a tab picked in another game is still on there.
 int ui_configurable_tabs(const struct pd_ui* ui, enum pd_tab out[UI_BAR_CHOICES]) {
     int n = 0;
     for (int i = 0; i < UI_BAR_CHOICES; i++) {
         const enum pd_tab tab = UI_BAR_CHOICE[i];
-        if (!ui->availableTabs || (ui->availableTabs & (1u << tab))) out[n++] = tab;
+        if (ui->drawnGame || ui->content ? ui_tab_available(ui, ui->drawnGame, tab)
+                                         : !ui->availableTabs || (ui->availableTabs & (1u << tab)))
+            out[n++] = tab;
     }
     return n;
 }
@@ -563,6 +567,7 @@ static void act(struct pd_ui* ui, int id) {
             if (ui->overlay == PD_OVERLAY_PICK_SCREEN) ui->settings->screenMode = i + (ui->pixelOff ? 1 : 0);
             if (ui->overlay == PD_OVERLAY_PICK_FF && i < PD_FF_CHOICES) ui->settings->ffSpeed = PD_FF_SPEEDS[i];
             if (ui->overlay == PD_OVERLAY_PICK_ASPECT && i < PD_ASPECTS) ui->settings->aspect = i;
+            if (ui->overlay == PD_OVERLAY_PICK_ZOOM && i < ui->zoomCount) ui->settings->zoom = i;
             if (ui->overlay == PD_OVERLAY_PICK_VIEW) pd_view_set(ui->settings, i, ui->viewExpand);
             if (ui->overlay == PD_OVERLAY_PICK_SPEED) ui->settings->gameSpeed = i;
             if (ui->overlay == PD_OVERLAY_PICK_SCENE && i < PD_SCENE_SPEED_COUNT) ui->settings->sceneSpeed[ui->scenePick] = i;
@@ -704,6 +709,8 @@ static void act(struct pd_ui* ui, int id) {
     } else if (id == HIT_SETTING + SETTING_AUTO_ZOOM) {
         ui->settings->autoZoom = !ui->settings->autoZoom;
         ui->action = PD_ACTION_SETTINGS_CHANGED;
+    } else if (id == HIT_SETTING + SETTING_ZOOM) {
+        ui->overlay = PD_OVERLAY_PICK_ZOOM;
     } else if (id >= HIT_SETTING && id <= HIT_SETTING + SETTING_ASPECT) {
         static const enum pd_overlay OPENS[] = {
             [SETTING_SCREEN] = PD_OVERLAY_PICK_SCREEN,
@@ -713,7 +720,14 @@ static void act(struct pd_ui* ui, int id) {
             [SETTING_LEAVE] = PD_OVERLAY_CONFIRM_LEAVE,
             [SETTING_ASPECT] = PD_OVERLAY_PICK_ASPECT,
         };
-        ui->overlay = OPENS[id - HIT_SETTING];
+        // With ZOOM's steps (a host that has them), ASPECT is the app's EXPAND on / off: two values, so it
+        // flips in place. A host without them keeps the pick-list.
+        if (id == HIT_SETTING + SETTING_ASPECT && ui->zoomCount > 1) {
+            ui->settings->aspect = ui->settings->aspect == PD_ASPECT_ORIGINAL ? PD_ASPECT_EXPAND : PD_ASPECT_ORIGINAL;
+            ui->action = PD_ACTION_SETTINGS_CHANGED;
+        } else {
+            ui->overlay = OPENS[id - HIT_SETTING];
+        }
     }
 }
 
@@ -728,7 +742,7 @@ bool pd_ui_settings_control(struct pd_ui* ui, int dy, bool accept) {
     return true;
 }
 
-/* A BUTTON row: the next button (X, Y, L2, R2; the HUD's also NONE). A button another action already uses goes to
+/* A BUTTON row: the next button (X, Y, L2, R2, L3; the HUD's also NONE). A button another action already uses goes to
  * this one's old button, so no two actions ever share one; the HUD's NONE can't be handed to the other two. */
 static void cycle_button(struct pd_settings* s, int row) {
     int* mine = row == SETTING_QUICK_BTN ? &s->quickBtn : row == SETTING_COMPANION_BTN ? &s->companionBtn : &s->hudBtn;

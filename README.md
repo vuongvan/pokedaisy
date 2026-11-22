@@ -141,7 +141,7 @@ Any Android 8.0+ device runs the games.
   <a href="#android"><img src="https://img.shields.io/badge/Android-APK-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android"></a>
   <a href="#linux"><img src="https://img.shields.io/badge/Linux-Steam%20Deck%20%C2%B7%20handhelds-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Linux"></a>
   <a href="#nintendo-3ds"><img src="https://img.shields.io/badge/Nintendo%203DS-preview-D12228?style=for-the-badge&logo=nintendo3ds&logoColor=white" alt="Nintendo 3DS"></a>
-  <img src="https://img.shields.io/badge/Windows-soon-8a8a98?style=for-the-badge&logo=windows&logoColor=white" alt="Windows: coming soon">
+  <a href="#windows"><img src="https://img.shields.io/badge/Windows-beta-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows"></a>
   <img src="https://img.shields.io/badge/iOS-soon-8a8a98?style=for-the-badge&logo=apple&logoColor=white" alt="iOS: coming soon">
 </p>
 
@@ -173,7 +173,13 @@ Guide: [Install on Linux, Steam Deck and handhelds](https://pokedaisy.com/docs/l
 An early preview, for a 3DS with custom firmware and the Homebrew Launcher:
 [`pokedaisy.3dsx`](https://github.com/lidor30/pokedaisy/releases/latest/download/pokedaisy.3dsx). Guide: [Install on a Nintendo 3DS](https://pokedaisy.com/docs/3ds/).
 
-### Windows and iOS
+### Windows
+
+Windows 10 or 11, on a 64-bit PC, in the betas for now: `PokeDaisy-<version>-windows-x86_64.zip` on the
+[releases page](https://github.com/lidor30/pokedaisy/releases). Extract it and start `PokeDaisy.exe`. Guide:
+[Install on Windows](docs/manual/windows-install.md).
+
+### iOS
 
 In the works.
 

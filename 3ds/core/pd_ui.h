@@ -72,6 +72,7 @@ struct pd_settings {
     int ffSpeed;    // PD_FF_MIN..PD_FF_MAX
     int guideNotice; // a bit per game kind whose GUIDE notice was accepted
     int aspect;      // enum pd_aspect (hosts with hasExpand only)
+    int zoom;        // ZOOM: EXPAND's step, 0 = 1x (hosts with zoomCount > 1)
     bool autoZoom;   // AUTO ZOOM IN: ZOOM OUT steps back in off the plain overworld
     bool wildOff;    // WILD ENCOUNTERS off (hosts that can: the Linux host's quick menu)
     int tabBar;      // TAB BAR: a bit per enum pd_tab on the bar (PARTY .. DEX, CARD); the rest open from MORE
@@ -126,7 +127,8 @@ struct pd_nuz_run;
 extern const char* const PD_SCENE_SPEEDS[PD_SCENE_SPEED_COUNT];
 enum pd_scene { PD_SCENE_BATTLE, PD_SCENE_TEXT, PD_SCENE_MENU, PD_SCENE_BIKE, PD_SCENE_SURF, PD_SCENES };
 
-enum pd_button { PD_BTN_X, PD_BTN_Y, PD_BTN_L2, PD_BTN_R2, PD_BTN_NONE, PD_BUTTONS };
+// L3 comes after NONE so settings files written before it existed keep their NONE (hudbtn=4).
+enum pd_button { PD_BTN_X, PD_BTN_Y, PD_BTN_L2, PD_BTN_R2, PD_BTN_NONE, PD_BTN_L3, PD_BUTTONS };
 
 // GAME SPEED's steps, as the app's SPEED_STEPS: the old five, then the slow two.
 #define PD_GAME_SPEED_COUNT 7
@@ -200,6 +202,9 @@ struct pd_host_info {
     bool hideScreenMode; // Optional: host owns display scaling. Zero keeps the 3DS row.
     bool hasExpand;      // Optional: the host can EXPAND (ASPECT / AUTO ZOOM IN rows) ...
     bool expandGame;     // ... and does for this game (else ASPECT reads N/A)
+    // Optional: ZOOM's steps for this game and screen (1 = only 1x, so no ZOOM row); zoomLabels[0] is "1x".
+    int zoomCount;
+    const char* const* zoomLabels;
     bool hasHud;         // Optional: the host draws the HUD over the game (its SETTINGS row)
     bool hasDisplayFilter; // host implements OFF / LCD
     bool hasQuickMenu;   // host implements the selectable RING / GRID quick menu
@@ -254,6 +259,7 @@ enum pd_overlay {
     PD_OVERLAY_PLACES,       // the MAP's list of places
     PD_OVERLAY_GUIDE_NOTICE, // the GUIDE's "AI-written, may be wrong" notice
     PD_OVERLAY_PICK_ASPECT,
+    PD_OVERLAY_PICK_ZOOM, // ZOOM: the steps out (hosts with zoomCount > 1)
     PD_OVERLAY_PICK_VIEW,
     PD_OVERLAY_TAB_BAR, // SETTINGS > TAB BAR: each tab ON / OFF
     PD_OVERLAY_HUD,     // SETTINGS > HUD: the HUD and its parts ON / OFF
@@ -479,6 +485,9 @@ struct pd_ui {
     int switchFrom, switchTo; // PD_ACTION_PARTY_SWAP's slots
     bool summaryEvolve;       // the summary's EVOLVE (TRADE EVOS): its Pokémon evolves by trading now
     bool viewExpand; // VIEW's pick-list offers EXPAND (this game can)
+    // ZOOM's steps for this game (hosts with zoomCount > 1), copied from the host for the pick-list.
+    int zoomCount;
+    const char* const* zoomLabels;
     // BOXES: what the host read (NULL = the tab isn't here), the box asked for, the picked slot and the box summary.
     const struct pd_boxes* boxes;
     bool boxMoves;   // WITHDRAW / DEPOSIT / SWAP work here
@@ -562,6 +571,8 @@ struct pd_ui {
 
 // Shared modal choice window for backend-owned preferences (selection is host-owned).
 void pd_ui_choices_view(struct pd_canvas*, const char*, const char* const*, int, int);
+// The same window, recording its rows in [ui] for a host's pointer (HIT_OPTION + row).
+void pd_ui_choices_view_ui(struct pd_ui*, struct pd_canvas*, const char*, const char* const*, int, int);
 
 // Shared party body, including its original frames, HP bars, status and summary.
 struct pd_map_viewport { int x, y, w, h; };
@@ -613,6 +624,7 @@ void pd_ui_party_summary_control(struct pd_ui*, const struct pd_snapshot*, int d
 // The buttons on the companion (keyFocus): a direction (0 up, 1 down, 2 left, 3 right), A on what the cursor's on.
 void pd_ui_focus_move(struct pd_ui* ui, int direction);
 void pd_ui_focus_press(struct pd_ui* ui);
+bool pd_ui_tap(struct pd_ui* ui, int x, int y);
 bool pd_ui_back(struct pd_ui* ui);
 // The last thing the player asked the host for (once), or PD_ACTION_NONE.
 enum pd_action pd_ui_take_action(struct pd_ui* ui);

@@ -370,6 +370,8 @@
   "The app (APK)": "앱 (APK)",
   "The app (.3dsx)": "앱 (.3dsx)",
   "The app for the HOME Menu (.cia)": "HOME 메뉴용 앱 (.cia)",
+  "Windows 10 or 11, on a 64-bit PC.": "64비트 PC의 Windows 10 또는 11.",
+  "Windows PCs": "Windows PC",
   "Steam Deck and Linux PCs": "Steam Deck과 리눅스 PC",
   "TrimUI handhelds (CrossMix, NextUI)": "TrimUI 휴대용 기기 (CrossMix, NextUI)",
   "PortMaster handhelds (ROCKNIX, Knulli, muOS)": "PortMaster 휴대용 기기 (ROCKNIX, Knulli, muOS)",
@@ -378,5 +380,18 @@
   "Cores for RetroArch, on an ARM handheld": "RetroArch용 코어 (ARM 휴대용 기기)",
   "SUPPORT": "후원",
   "Dark mode": "다크 모드",
-  "CHOOSE A FILE": "파일 선택"
+  "CHOOSE A FILE": "파일 선택",
+  "DOWNLOAD BETA": "베타 다운로드",
+  "Download the beta's APK on your Android device.": "안드로이드 기기에서 베타 APK를 받아요.",
+  "EVERY FILE OF THE BETA ON GITHUB": "베타의 모든 파일은 GITHUB에",
+  "GET THE BETA": "베타 받기",
+  "Get the beta": "베타 받기",
+  "HOW TO GET IT": "받는 방법",
+  "IN THE BETA": "베타에서 지원",
+  "Only in the beta, {version}, so far.": "지금은 베타에서만 지원해요 (버전 {version}).",
+  "Open it and install it over PokeDaisy. Your games, saves and settings stay.": "파일을 열어 지금 쓰는 PokeDaisy 위에 설치해요. 게임, 세이브, 설정은 그대로 남아요.",
+  "PokeDaisy {version} is out for testing, before it goes out to everyone. A beta can still have rough edges.": "PokeDaisy {version} 버전은 모두에게 나오기 전의 테스트 버전이에요. 베타라서 아직 다듬어지지 않은 곳이 있을 수 있어요.",
+  "PokeDaisy {version} reads {n} more games and versions, before it goes out to everyone. A beta can still have rough edges.": "PokeDaisy {version} 버전은 모두에게 나오기 전에 게임과 버전 {n}개를 더 지원해요. 베타라서 아직 다듬어지지 않은 곳이 있을 수 있어요.",
+  "That's it. From then on Settings > <b>BETA UPDATES</b> is on, so the app offers you each new beta and then the full version. Turn it off to wait for the full version instead.": "이제 끝이에요. 그다음부터는 설정 > <b>베타 업데이트</b>가 켜져 있어서, 새 베타가 나올 때마다, 그리고 정식 버전이 나오면 앱이 알려 줘요. 정식 버전을 기다리려면 꺼 두세요.",
+  "The companion reads {title} from the beta on ({beta}). The version everyone gets doesn't yet, so install the beta to use it.": "컴패니언은 베타({beta})부터 이 게임을 읽어요: {title}. 모두가 받는 버전은 아직 못 읽으니, 쓰려면 베타를 설치해 주세요."
 }

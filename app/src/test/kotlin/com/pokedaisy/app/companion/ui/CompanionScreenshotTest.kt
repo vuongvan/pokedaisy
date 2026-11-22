@@ -293,6 +293,14 @@ open class CompanionScreenshotTest {
         ),
     )
 
+    /** A game RetroAchievements knows with no achievements made for it yet (GitHub #1178). */
+    @Test fun achievementsNoneYet() = achievementsShot(
+        com.pokedaisy.app.companion.AchievementsState(
+            user = "Lidor",
+            game = com.pokedaisy.app.companion.AchievementGame(35631, "Pokemon Heart & Soul", "5d14746c8e95c0979a374e80ec123096", 0, 0, 0, 0),
+        ),
+    )
+
     private fun achievementsShot(state: com.pokedaisy.app.companion.AchievementsState) = snapshot {
         CompanionScreen(
             SampleCompanion.snapshot, SampleCompanion.Slots,

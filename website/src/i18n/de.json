@@ -370,6 +370,8 @@
   "The app (APK)": "Die App (APK)",
   "The app (.3dsx)": "Die App (.3dsx)",
   "The app for the HOME Menu (.cia)": "Die App fürs HOME-Menü (.cia)",
+  "Windows 10 or 11, on a 64-bit PC.": "Windows 10 oder 11 auf einem 64-Bit-PC.",
+  "Windows PCs": "Windows-PCs",
   "Steam Deck and Linux PCs": "Steam Deck und Linux-PCs",
   "TrimUI handhelds (CrossMix, NextUI)": "TrimUI-Handhelds (CrossMix, NextUI)",
   "PortMaster handhelds (ROCKNIX, Knulli, muOS)": "Handhelds mit PortMaster (ROCKNIX, Knulli, muOS)",
@@ -378,5 +380,18 @@
   "Cores for RetroArch, on an ARM handheld": "Cores für RetroArch, auf einem ARM-Handheld",
   "SUPPORT": "UNTERSTÜTZEN",
   "Dark mode": "Dunkler Modus",
-  "CHOOSE A FILE": "DATEI WÄHLEN"
+  "CHOOSE A FILE": "DATEI WÄHLEN",
+  "DOWNLOAD BETA": "BETA HERUNTERLADEN",
+  "Download the beta's APK on your Android device.": "Lade das APK der Beta auf dein Android-Gerät.",
+  "EVERY FILE OF THE BETA ON GITHUB": "ALLE DATEIEN DER BETA AUF GITHUB",
+  "GET THE BETA": "BETA HOLEN",
+  "Get the beta": "Hol dir die Beta",
+  "HOW TO GET IT": "SO GEHT'S",
+  "IN THE BETA": "IN DER BETA",
+  "Only in the beta, {version}, so far.": "Bisher nur in der Beta ({version}).",
+  "Open it and install it over PokeDaisy. Your games, saves and settings stay.": "Öffne es und installiere es über PokeDaisy. Deine Spiele, Spielstände und Einstellungen bleiben.",
+  "PokeDaisy {version} is out for testing, before it goes out to everyone. A beta can still have rough edges.": "PokeDaisy {version} ist zum Testen da, bevor es an alle geht. Eine Beta kann noch Ecken und Kanten haben.",
+  "PokeDaisy {version} reads {n} more games and versions, before it goes out to everyone. A beta can still have rough edges.": "PokeDaisy {version} liest {n} weitere Spiele und Versionen, bevor es an alle geht. Eine Beta kann noch Ecken und Kanten haben.",
+  "That's it. From then on Settings > <b>BETA UPDATES</b> is on, so the app offers you each new beta and then the full version. Turn it off to wait for the full version instead.": "Fertig. Ab dann ist OPTIONEN > <b>BETA-UPDATES</b> an: Die App bietet dir jede neue Beta an und danach die fertige Version. Schalte es aus, wenn du lieber auf die fertige Version wartest.",
+  "The companion reads {title} from the beta on ({beta}). The version everyone gets doesn't yet, so install the beta to use it.": "Der Begleiter liest {title} ab der Beta ({beta}). Die Version für alle kann das noch nicht, also installiere die Beta, um es zu nutzen."
 }

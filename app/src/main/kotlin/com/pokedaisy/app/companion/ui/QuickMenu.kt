@@ -137,6 +137,12 @@ class QuickMenuState {
     /** Where the ring put each tile, as a turn from the top clockwise (0..1), for [aim]; set as it lays out. */
     internal var ringTurns: FloatArray = FloatArray(0)
 
+    /** The tiles' size as last measured (px, zero before): whether the [ring] has room on this screen ([ringFits]). */
+    internal var tileSize by mutableStateOf(androidx.compose.ui.unit.IntSize.Zero)
+
+    /** The screen has room for the [ring] as last laid out (else the grid stands in, GitHub #1225): the stick aims only then. */
+    internal var ringRoom = true
+
     /** The highlighted tile, in [items]. */
     var index by mutableIntStateOf(0)
         private set
@@ -250,7 +256,7 @@ class QuickMenuState {
      * that way, the first one at the top and on round clockwise. True = taken (a ring with tiles, no list up).
      */
     fun aim(x: Float, y: Float): Boolean {
-        if (!open || !ring || listing || items.isEmpty()) return false
+        if (!open || !ring || !ringRoom || listing || items.isEmpty()) return false
         if (sqrt(x * x + y * y) < AIM_DEAD) return true
         val n = items.size
         val turn = (atan2(x, -y) / (2 * PI)).toFloat().let { if (it < 0) it + 1 else it }
@@ -441,7 +447,15 @@ fun QuickMenu(state: QuickMenuState, snapshot: SnapshotView, actions: QuickActio
             val current = items.getOrNull(state.index)
             val why = current?.let { quickBlocked(it, snapshot, repelSteps, dark, flying) }
             val hint = current?.let { why ?: quickHint(it, actions) }
-            val ring = state.ring
+            // RING where it has room: on a small screen (a phone's short side, a split screen) its tiles would run into
+            // each other, so the grid stands in (GitHub #1225).
+            val room = state.tileSize.let { t ->
+                t == androidx.compose.ui.unit.IntSize.Zero || with(LocalDensity.current) {
+                    ringFits(items.size, t.width.toFloat(), t.height.toFloat(), (u * RING_GAP).toPx(), (maxWidth * RING_ROOM).toPx(), (maxHeight * RING_ROOM).toPx())
+                }
+            }
+            state.ringRoom = room
+            val ring = state.ring && room
             val tile: @Composable (Int) -> Unit = { i ->
                 // UniformTiles' slots can recompose with the count they were last measured with while this lambda
                 // already sees the new, shorter list (an action no longer offered): skip the index that's gone.
@@ -461,14 +475,14 @@ fun QuickMenu(state: QuickMenuState, snapshot: SnapshotView, actions: QuickActio
                         repels != null -> RepelKinds(state, repels, snapshot, m)
                         items.isEmpty() -> GbaText(tr("Nothing to show: pick actions in SETTINGS > QUICK MENU"), ink.text, ink.shadow, m, maxLines = 2)
                         else -> {
-                            TileGrid(items.size, gap = u * 5, tile)
+                            TileGrid(state, items.size, gap = u * 5, tile)
                             if (hint != null) GbaText(hint, ink.text, ink.shadow, rememberGbaTextMetrics(0.75f), maxLines = 2)
                         }
                     }
                 }
             } else {
                 // The highlighted one's name (and why it's dimmed) in the middle, like a game's weapon wheel.
-                TileRing(state, items.size, gap = u * 10, maxW = maxWidth * 0.96f, maxH = maxHeight * 0.96f, { fan }, tile) {
+                TileRing(state, items.size, gap = u * RING_GAP, maxW = maxWidth * RING_ROOM, maxH = maxHeight * RING_ROOM, { fan }, tile) {
                     // With names on the tiles, the middle only says why the highlighted one is dimmed (or WILD's state).
                     val name = if (state.labels) null else quickLabel(current ?: QuickAction.PC, actions)
                     val note = why ?: if (current == QuickAction.WILD || current == QuickAction.TURBO) quickHint(current, actions) else null
@@ -499,6 +513,8 @@ private fun UniformTiles(
     size: (w: Int, h: Int, c: Constraints) -> Pair<Int, Int>,
     /** How wide [extra] may be, given the tile size. */
     extraWidth: (w: Int, h: Int) -> Int = { _, _ -> Constraints.Infinity },
+    /** Told the tiles' size each time they're measured. */
+    onTileSize: (w: Int, h: Int) -> Unit = { _, _ -> },
 ) {
     SubcomposeLayout(modifier) { c ->
         val loose = Constraints()
@@ -506,6 +522,7 @@ private fun UniformTiles(
         val w = probe.maxOfOrNull { it.width } ?: 0
         val h = probe.maxOfOrNull { it.height } ?: 0
         val tiles = subcompose("tiles") { for (i in 0 until n) tile(i) }.map { it.measure(Constraints.fixed(w, h)) }
+        onTileSize(w, h)
         val (lw, lh) = size(w, h, c)
         val more = subcompose("extra", extra).map { it.measure(Constraints(maxWidth = minOf(lw, extraWidth(w, h)).coerceAtLeast(0), maxHeight = lh)) }
         layout(lw, lh) { place(tiles, w, h, more) }
@@ -514,11 +531,11 @@ private fun UniformTiles(
 
 /** GRID: as many tiles a row as the width takes, the rows evened out (9 = 5 + 4, not 8 + 1) and each centred. */
 @Composable
-private fun TileGrid(n: Int, gap: Dp, tile: @Composable (Int) -> Unit) {
+private fun TileGrid(state: QuickMenuState, n: Int, gap: Dp, tile: @Composable (Int) -> Unit) {
     val g = with(LocalDensity.current) { gap.roundToPx() }
     var cols = 1
     UniformTiles(
-        n, Modifier, tile,
+        n, Modifier, tile, onTileSize = { w, h -> state.tileSize = androidx.compose.ui.unit.IntSize(w, h) },
         size = { w, h, c ->
             val fit = ((c.maxWidth + g) / (w + g)).coerceIn(1, n.coerceAtLeast(1))
             val rows = ceil(n / fit.toFloat()).toInt().coerceAtLeast(1)
@@ -547,7 +564,7 @@ private fun TileRing(state: QuickMenuState, n: Int, gap: Dp, maxW: Dp, maxH: Dp,
     val (gapPx, limW, limH) = with(density) { Triple(gap.toPx(), maxW.toPx(), maxH.toPx()) }
     var places = RingPlaces(0f, 0f, FloatArray(0), FloatArray(0))
     UniformTiles(
-        n, Modifier, tile, extra = center,
+        n, Modifier, tile, extra = center, onTileSize = { w, h -> state.tileSize = androidx.compose.ui.unit.IntSize(w, h) },
         size = { w, h, _ ->
             places = ringPlaces(n, w.toFloat(), h.toFloat(), gapPx, limW, limH)
             state.ringTurns = places.turns
@@ -571,6 +588,23 @@ private fun TileRing(state: QuickMenuState, n: Int, gap: Dp, maxW: Dp, maxH: Dp,
         // The hint inside the ring, clear of the tiles at its sides.
         extraWidth = { w, _ -> (2 * places.rx - w - 2 * gapPx).roundToInt() },
     )
+}
+
+/** The ring's gap between tiles (GBA pixels) and how much of the screen it may take. */
+private const val RING_GAP = 10
+private const val RING_ROOM = 0.96f
+
+/**
+ * The ring of [n] tiles of [w] x [h] ([ringPlaces] with [gap]) fits [limW] x [limH] with every two tiles at least half a
+ * [gap] apart. On a small screen the oval's sides run into each other - not only neighbours: its two halves cross.
+ */
+fun ringFits(n: Int, w: Float, h: Float, gap: Float, limW: Float, limH: Float): Boolean {
+    if (n < 2) return true
+    val r = ringPlaces(n, w, h, gap, limW, limH)
+    if (2 * r.rx + w > limW + .5f || 2 * r.ry + h > limH + .5f) return false
+    for (i in 0 until n) for (j in i + 1 until n)
+        if (maxOf(abs(r.x[j] - r.x[i]) - w, abs(r.y[j] - r.y[i]) - h) < gap / 2 - .01f) return false
+    return true
 }
 
 /** How long the ring takes to open and to close, how small a tile starts, and how much of that time one tile's trip takes. */

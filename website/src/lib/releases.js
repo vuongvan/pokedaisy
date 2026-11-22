@@ -1,9 +1,17 @@
 // GitHub releases, read once at build time (the deploy workflow passes GITHUB_TOKEN and also
 // rebuilds when a release is published). Offline, the site builds without them.
-const REPO = 'lidor30/pokedaisy';
+export const REPO = 'lidor30/pokedaisy';
 export const REPO_URL = `https://github.com/${REPO}`;
 
 let cached;
+// GitHub's list as it came (pre-releases too): betaRelease.js' getBeta picks the beta from it.
+let raw;
+
+/** GitHub's releases list as it came, after [getReleases] (undefined offline). */
+export async function rawReleases() {
+  await getReleases();
+  return raw;
+}
 
 export async function getReleases() {
   if (cached) return cached;
@@ -13,6 +21,7 @@ export async function getReleases() {
     const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=50`, { headers });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const list = await res.json();
+    raw = list;
     cached = list
       .filter((r) => !r.draft && !r.prerelease)
       .map((r) => ({

@@ -2,7 +2,7 @@
 // hand: change those and run `make -C 3ds tables`. The keys the 3DS / Linux code uses, in strcmp order (pd_tr.h).
 #include "pd_tr.h"
 
-const struct pd_tr_entry pd_tr_table[736] = {
+const struct pd_tr_entry pd_tr_table[738] = {
     { "  HACK", { "  HACK", NULL, NULL, NULL, NULL, NULL, NULL } },
     { "  NONE", { "  NONE", "  AUCUN", "  KEINS", "  NESSUNO", "  NINGUNO", "  NENHUM", "  NENHUM" } },
     { "  SHINY", { "  SHINY", "  CHROMATIQUE", "  SCHILLERND", "  CROMATICO", "  VARIOCOLOR", "  BRILHANTE", "  BRILHANTE" } },
@@ -335,6 +335,7 @@ const struct pd_tr_entry pd_tr_table[736] = {
     { "MAP", { "MAP", "CARTE", "KARTE", "MAPPA", "MAPA", "MAPA", "MAPA" } },
     { "MAX", { "MAX", NULL, NULL, NULL, "MÁX", "MÁX.", "MÁX." } },
     { "ME", { "ME", "MOI", "ICH", "IO", "YO", "EU", "EU" } },
+    { "MENU", { "MENU", NULL, "MENÜ", NULL, "MENÚ", NULL, NULL } },
     { "MENU SPEED", { "MENU SPEED", "VITESSE MENUS", "MENÜTEMPO", "VELOCITÀ MENU", "VEL. MENÚS", "VEL. MENUS", "VEL. MENUS" } },
     { "MINIMAP", { "MINIMAP", "MINI-CARTE", "MINIKARTE", "MINIMAPPA", "MINIMAPA", "MINIMAPA", "MINIMAPA" } },
     { "MISSED", { "MISSED", "RATÉ", "VERPASST", "PERSO", "PERDIDO", "PERDIDO", "PERDIDO" } },
@@ -713,6 +714,7 @@ const struct pd_tr_entry pd_tr_table[736] = {
     { "Your party and PC, a Pokémon's level, nature,", { "Your party and PC, a Pokémon's level, nature,", "Votre équipe et PC, le niveau, la nature,", "Dein Team und PC, Level und Wesen,", "Squadra e PC, livello e natura,", "Tu equipo y PC, el nivel, la naturaleza,", "Sua equipe e PC, nível, natureza,", "A tua equipa e PC, nível, natureza," } },
     { "Your party is full", { "Your party is full", "Votre équipe est pleine", "Dein Team ist voll", "La tua squadra è piena", "Tu equipo está lleno", "Sua equipe está cheia", "A sua equipe está cheia" } },
     { "ZEPPELIN", { "ZEPPELIN", "DIRIGEABLE", NULL, "DIRIGIBILE", "ZEPELÍN", "DIRIGÍVEL", "DIRIGÍVEL" } },
+    { "ZOOM", { "ZOOM", NULL, NULL, NULL, NULL, NULL, NULL } },
     { "ZOOM OUT", { "ZOOM OUT", "DÉZOOMER", "HERAUSZOOMEN", "RIMPICCIOLISCI", "ALEJAR", "AFASTAR", "AFASTAR" } },
     { "a Pokémon or an empty place on the other.", { "a Pokémon or an empty place on the other.", "un Pokémon ou une place libre de l'autre.", "ein Pokémon oder einen freien Platz auf der anderen.", "un Pokémon o un posto libero dall'altro.", "un Pokémon o un hueco libre en el otro.", "um Pokémon ou lugar vazio do outro.", "um Pokémon ou lugar vazio do outro." } },
     { "added here. The events are on TRAINER.", { "added here. The events are on TRAINER.", "pas d'ajout ici. Les événements sont dans DRESSEUR.", "hier nicht hinzufügbar. Die Events stehen unter TRAINER.", "non si aggiungono. Gli eventi sono in ALLENATORE.", "no se añaden. Los eventos están en ENTRENADOR.", "não se adicionam. Os eventos estão em TREINADOR.", "não se adicionam. Os eventos estão em TREINADOR." } },
@@ -740,4 +742,4 @@ const struct pd_tr_entry pd_tr_table[736] = {
     { "the game.", { "the game.", "dans le jeu.", "im Spiel ab.", "nel gioco.", "en el juego.", "no jogo.", "no jogo." } },
     { "x%d  (a stack holds %d)", { "x%d  (a stack holds %d)", "x%d  (une pile en contient %d)", "x%d  (ein Stapel fasst %d)", "x%d  (una pila ne tiene %d)", "x%d  (un montón lleva %d)", "x%d  (uma pilha tem %d)", "x%d  (uma pilha tem %d)" } },
 };
-const int pd_tr_table_count = 736;
+const int pd_tr_table_count = 738;

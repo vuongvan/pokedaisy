@@ -51,7 +51,7 @@ object WhatsNew {
             Section(
                 NEW,
                 listOf(
-                    "New games: Clover, Elysium, Sacred Gold and Storm Silver, Oops All Eevees!, Rhythm, Ceruleum, RecordKeepers, Red and Yellow with Gen II Graphics, Italian Unbound, and the German Platinum, HeartGold, SoulSilver, Black, White, Black 2 and White 2.",
+                    "New games: Clover, Elysium, Sacred Gold and Storm Silver, Oops All Eevees!, Rhythm, Ceruleum, RecordKeepers, Red and Yellow with Gen II Graphics, Italian Unbound, and the German Platinum.",
                     "New look: the menus in the games' own summary colours, a move page, and FONT to pick the app's letters.",
                     "POKéMON PICTURES: each Pokémon's own picture on PARTY, in the summary, in battle and on the HUD.",
                     "Summary: drag a Pokémon's moves into a new order, and see an egg's types and stats before it hatches.",
@@ -60,8 +60,6 @@ object WhatsNew {
                     "DS games: INSTANT TEXT, REUSABLE TMS, EXP SHARE, SHINY ODDS, NUZLOCKE and IVs and EVs on STATS.",
                     "Ruby and Sapphire: HIDE BATTLE MENU, the POKéMON switch, LAST BALL, EXP SHARE, LEVEL CAP and the PC's moves.",
                     "DS CORE: BANANADS, a third DS emulator, on Android 10 and up.",
-                    "TRAINER CARD: on the German, French, Italian and Spanish FireRed, LeafGreen and Emerald.",
-                    "BOXES and battle INFO: sort a box by Pokédex number, and see the foe's nature.",
                     "BETA UPDATES: try new versions before everyone else, in Settings > APP.",
                 ),
             ),
@@ -69,7 +67,9 @@ object WhatsNew {
                 FIXES,
                 listOf(
                     "DS on one screen: the music keeps playing through menus, and Gen 5 no longer leaves an empty touch screen after a battle.",
+                    "DS at normal speed: every frame shows on 120 Hz screens, with the faster DS cores too.",
                     "EXPAND: weather now fills the whole view when you zoom out.",
+                    "Cheats: read when a game starts, not every time you flip one.",
                     "Weak devices: games run lighter, with EXPAND on too.",
                 ),
             ),

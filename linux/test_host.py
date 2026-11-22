@@ -46,6 +46,25 @@ with tempfile.TemporaryDirectory(prefix='pd-host-') as d:
     # Run again: the save is backed up first.
     run(d,str(d/'roms/diagnostic.gb'),'--frames','10')
     backups=list((d/'saves/pokedaisy-backups').glob('diagnostic.gb.backup-*.sav'));assert len(backups)==1,backups
+    # A save named after the ROM without its extension (another emulator's: pokeblack2.nds -> pokeblack2.sav) is used as it is,
+    # for a ROM no other ROM beside it shares the name of.
+    shutil.copy(diag/'diagnostic.gb',d/'roms'/'solo.gb')
+    (d/'saves/solo.sav').write_bytes(b'\0'*8192)
+    run(d,str(d/'roms/solo.gb'),'--frames','120')
+    assert (d/'saves/solo.sav').read_bytes()[:1]==b'\x5a','the save named without the ROM extension was not the one written'
+    assert not (d/'saves/solo.gb.sav').exists(),'the ROM-named save was made beside the other emulator name'
+    # With both names there, the ROM's own file name wins.
+    (d/'saves/solo.gb.sav').write_bytes(b'\0'*8192)
+    run(d,str(d/'roms/solo.gb'),'--frames','120')
+    assert (d/'saves/solo.gb.sav').read_bytes()[:1]==b'\x5a','the ROM-named save did not win'
+    (d/'roms/solo.gb').unlink()
+    # diagnostic.gb has diagnostic.gba and .nds beside it: diagnostic.sav could be any of theirs, so it's left alone.
+    (d/'saves/diagnostic.gb.sav').rename(d/'saves/diagnostic.sav')
+    (d/'saves/diagnostic.sav').write_bytes(b'\0'*8192)
+    run(d,str(d/'roms/diagnostic.gb'),'--frames','120')
+    assert (d/'saves/diagnostic.sav').read_bytes()==b'\0'*8192,'a save another ROM could own was written'
+    assert (d/'saves/diagnostic.gb.sav').read_bytes()[:1]==b'\x5a','the ROM-named save was not made'
+    (d/'saves/diagnostic.sav').unlink()
     # A Game Boy cartridge with a clock (MBC3, as Crystal's): the clock is kept after the save, mGBA's layout.
     rtc=bytearray((diag/'diagnostic.gb').read_bytes());rtc[0x147]=0x10;rtc[0x14d]=(-sum(rtc[0x134:0x14d])-25)&255
     (d/'roms/clock.gb').write_bytes(rtc)
@@ -103,9 +122,9 @@ with tempfile.TemporaryDirectory(prefix='pd-host-') as d:
     run(d,str(d/'roms/diagnostic.gb'),'--frames','80')
     del env['POCKET_KEYS']
     assert (d/'states/diagnostic.gb.ss').exists(),'SAVE STATE from the host menu wrote nothing'
-    # A/B BUTTONS (seven rows down from RESUME) is saved with the host's settings.
-    env['POCKET_KEYS']='20:menu,'+','.join(f'{30+10*i}:down' for i in range(7))+',110:a'
-    run(d,str(d/'roms/diagnostic.gb'),'--frames','140')
+    # A/B BUTTONS (eight rows down from RESUME, past KEYBOARD) is saved with the host's settings.
+    env['POCKET_KEYS']='20:menu,'+','.join(f'{30+10*i}:down' for i in range(8))+',120:a'
+    run(d,str(d/'roms/diagnostic.gb'),'--frames','150')
     del env['POCKET_KEYS']
     assert 'swap_ab=1' in (d/'host.ini').read_text(),(d/'host.ini').read_text()
     # HOTKEYS (three rows down): REWIND takes L3; SAVE STATE takes R2, which FAST FORWARD then loses.

@@ -361,5 +361,18 @@
   "The app (APK)": "A app (APK)",
   "The app (.3dsx)": "A app (.3dsx)",
   "The app for the HOME Menu (.cia)": "A app para o menu HOME (.cia)",
-  "CHOOSE A FILE": "ESCOLHA UM FICHEIRO"
+  "CHOOSE A FILE": "ESCOLHA UM FICHEIRO",
+  "DOWNLOAD BETA": "TRANSFERIR BETA",
+  "Download the beta's APK on your Android device.": "Transfira o APK da beta no seu dispositivo Android.",
+  "EVERY FILE OF THE BETA ON GITHUB": "TODOS OS FICHEIROS DA BETA NO GITHUB",
+  "GET THE BETA": "OBTER A BETA",
+  "Get the beta": "Obter a beta",
+  "HOW TO GET IT": "COMO OBTER",
+  "IN THE BETA": "NA BETA",
+  "Only in the beta, {version}, so far.": "Por agora, só na beta ({version}).",
+  "Open it and install it over PokeDaisy. Your games, saves and settings stay.": "Abra-o e instale-o por cima do PokeDaisy. Os seus jogos, gravações e definições ficam.",
+  "PokeDaisy {version} is out for testing, before it goes out to everyone. A beta can still have rough edges.": "PokeDaisy {version} está em teste antes de chegar a todos. Uma beta ainda pode ter falhas.",
+  "PokeDaisy {version} reads {n} more games and versions, before it goes out to everyone. A beta can still have rough edges.": "PokeDaisy {version} lê mais {n} jogos e versões, antes de chegar a todos. Uma beta ainda pode ter falhas.",
+  "That's it. From then on Settings > <b>BETA UPDATES</b> is on, so the app offers you each new beta and then the full version. Turn it off to wait for the full version instead.": "Já está. A partir daí, DEFINIÇÕES > <b>ATUALIZAÇÕES BETA</b> fica ligado: a aplicação oferece cada beta nova e depois a versão final. Desligue para esperar pela versão final.",
+  "The companion reads {title} from the beta on ({beta}). The version everyone gets doesn't yet, so install the beta to use it.": "O companheiro lê {title} a partir da beta ({beta}). A versão para todos ainda não, por isso instale a beta para o usar."
 }

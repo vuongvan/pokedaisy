@@ -474,7 +474,8 @@ class EmulatorEngine(
      * player's first steps, then remembered per ROM), a Game Boy game's screen matched to its map (pk_wide_gb.c's
      * SCENE_FIELD, [gbSceneGame]), no battle or region map up,
      * and at EXPAND (whose scene is known every frame, [MgbaCore.pkWideScene]) no text box, map preview or battle
-     * transition either; a fade between maps changes nothing. Comes on twenty frames after the field is
+     * transition either (without EXPAND, no text box or START menu by the field read's [MgbaCore.FIELD_TEXT], where the
+     * game's field is read); a fade between maps changes nothing. Comes on twenty frames after the field is
      * back (a conversation's lines don't make the HUD blink), goes at once. Set on the emu thread.
      */
     val onField = kotlinx.coroutines.flow.MutableStateFlow(false)
@@ -1562,8 +1563,12 @@ class EmulatorEngine(
                 if (dsMenuApp.value) dsMenuApp.value = false
             }
             if (wideApplied == WideScreen.OFF || (wideCamera == null && !probeOnly)) wideScene = -1
+            // A text box or the START menu (the field read's TEXT: controls locked, a window up) isn't the field: EXPAND's
+            // scene says so by itself, and without EXPAND (ORIGINAL / STRETCH: the HUD sits on the game's own picture,
+            // over those windows - GitHub #1208) the field read does.
+            val textUp = fieldState and MgbaCore.FIELD_TEXT != 0 && (nds || wideScene == -1)
             gameSession.observeField(
-                if (gba || nds) fieldScreen && !mapOpen && !(nds && fieldState and MgbaCore.FIELD_TEXT != 0) else wideScene == WideCamera.SCENE_FIELD,
+                if (gba || nds) fieldScreen && !mapOpen && !textUp else wideScene == WideCamera.SCENE_FIELD,
                 wideScene, battleInput.gameState, battleInput.holdFrame)
             if (onField.value != gameSession.onField) onField.value = gameSession.onField
         }

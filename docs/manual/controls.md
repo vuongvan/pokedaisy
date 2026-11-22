@@ -158,7 +158,7 @@ An action you can't use right now is greyed out and says why, like a battle goin
 
 Pick which actions show, and turn the rest off, in `QUICK MENU` (in the `CONTROLS` group of Settings on either screen): each action's row carries the icon of its tile. While a game is open, the companion's page lists only the actions that game has, so one your game can't do (`HEAL` in some ROM hacks, say) isn't there to turn on. Its `STYLE` picks how they're laid out (tap it to switch):
 
-- `RING` (to start with): the actions round a circle, like the weapon wheel in a modern game, each the same distance from the next. Point the left stick at one, and its name shows in the middle, with a light tick of vibration each time you move onto another one. The D-pad steps round it too.
+- `RING` (to start with): the actions round a circle, like the weapon wheel in a modern game, each the same distance from the next. Point the left stick at one, and its name shows in the middle, with a light tick of vibration each time you move onto another one. The D-pad steps round it too. On a screen too small for the circle (a small window, a split screen), the menu shows the grid instead.
 - `GRID`: rows of tiles, all the same size. The D-pad steps through them.
 
 `LABELS` (on to start with) puts each action's name under its icon. Turn it off for icons alone, smaller and closer together: the highlighted one is then named under the row, or in the middle of the ring.

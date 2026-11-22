@@ -370,6 +370,8 @@
   "The app (APK)": "La app (APK)",
   "The app (.3dsx)": "La app (.3dsx)",
   "The app for the HOME Menu (.cia)": "La app para el menú HOME (.cia)",
+  "Windows 10 or 11, on a 64-bit PC.": "Windows 10 u 11, en un PC de 64 bits.",
+  "Windows PCs": "PC con Windows",
   "Steam Deck and Linux PCs": "Steam Deck y PC con Linux",
   "TrimUI handhelds (CrossMix, NextUI)": "Portátiles TrimUI (CrossMix, NextUI)",
   "PortMaster handhelds (ROCKNIX, Knulli, muOS)": "Portátiles con PortMaster (ROCKNIX, Knulli, muOS)",
@@ -378,5 +380,18 @@
   "Cores for RetroArch, on an ARM handheld": "Núcleos para RetroArch, en portátil ARM",
   "SUPPORT": "APOYA",
   "Dark mode": "Modo oscuro",
-  "CHOOSE A FILE": "ELIGE UN ARCHIVO"
+  "CHOOSE A FILE": "ELIGE UN ARCHIVO",
+  "DOWNLOAD BETA": "DESCARGAR BETA",
+  "Download the beta's APK on your Android device.": "Descarga el APK de la beta en tu dispositivo Android.",
+  "EVERY FILE OF THE BETA ON GITHUB": "TODOS LOS ARCHIVOS DE LA BETA EN GITHUB",
+  "GET THE BETA": "CONSEGUIR LA BETA",
+  "Get the beta": "Consigue la beta",
+  "HOW TO GET IT": "CÓMO CONSEGUIRLA",
+  "IN THE BETA": "EN LA BETA",
+  "Only in the beta, {version}, so far.": "Por ahora solo en la beta ({version}).",
+  "Open it and install it over PokeDaisy. Your games, saves and settings stay.": "Ábrelo e instálalo encima de PokeDaisy. Tus juegos, partidas y ajustes se quedan.",
+  "PokeDaisy {version} is out for testing, before it goes out to everyone. A beta can still have rough edges.": "PokeDaisy {version} está en pruebas antes de llegar a todos. Una beta aún puede tener fallos.",
+  "PokeDaisy {version} reads {n} more games and versions, before it goes out to everyone. A beta can still have rough edges.": "PokeDaisy {version} lee {n} juegos y versiones más, antes de llegar a todos. Una beta aún puede tener fallos.",
+  "That's it. From then on Settings > <b>BETA UPDATES</b> is on, so the app offers you each new beta and then the full version. Turn it off to wait for the full version instead.": "Listo. A partir de ahí, Ajustes > <b>ACTUALIZACIONES BETA</b> está activado: la app te ofrece cada beta nueva y luego la versión final. Desactívalo si prefieres esperar a la versión final.",
+  "The companion reads {title} from the beta on ({beta}). The version everyone gets doesn't yet, so install the beta to use it.": "El compañero lee {title} desde la beta ({beta}). La versión para todos aún no, así que instala la beta para usarlo."
 }

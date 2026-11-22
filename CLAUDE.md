@@ -2518,8 +2518,9 @@ fails while it's stale: `UPDATE_SITE_DATA=1 ./gradlew :app:testDebugUnitTest --t
 **Website** (`website/`, Astro, static, Node 22.23.4+): its ROM check (`src/lib/compat.js`) runs
 `isSupported`'s rules in the browser over that JSON - the ROM is never uploaded; keep the two in step.
 Deployed to Firebase Hosting (`pokedaisy.com`) by `.github/workflows/website.yml` **only with an app release**
-(the user's rule: the site never lists games the downloadable APK can't run): a published, non-pre-release release
-deploys its tag's `website/`; pushes to main only build + test; a manual run takes a release tag (redeploy / roll
+(the user's rule: the site never lists games the downloadable APK can't run, except the newest beta's, tagged BETA with how
+to get it - the user's call, 2026-11-22: `src/lib/beta.js` / `betaRelease.js`, read from the beta's tag on GitHub at build
+time): a published, non-pre-release release deploys its tag's `website/`, a published pre-release the newest release's again; pushes to main only build + test; a manual run takes a release tag (redeploy / roll
 back). A site-only fix therefore waits for the next release (or a manual run of the current tag after moving it); the checker's ASK FOR SUPPORT opens the feedback form, prefilled through its #hash.
 The site's game matrix is README's Supported games table; a row of all "—" means detected but no companion yet,
 so the export lists it under `inProgress` - off the matrix, and "in progress" in the ROM check (none since R.O.W.E.

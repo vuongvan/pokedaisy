@@ -84,6 +84,12 @@ The app shows every license below in full under Settings > LICENSES.
   https://github.com/thwonp/dsperate-lr. It carries DSperate v3.3.0 as its own
   submodule, under the DSperate terms above; the collection package includes
   every license text in that tree.
+- The Windows package (PokeDaisy-<version>-windows-x86_64.zip, never the APK)
+  carries, beside the program and its cores: SDL2 (SDL2.dll), Copyright (C)
+  1997-2025 Sam Lantinga, zlib license - https://libsdl.org; the MinGW-w64
+  runtime's libwinpthread-1.dll, MIT / BSD-style license; GCC's
+  libgcc_s_seh-1.dll, GNU GPL 3.0 with the GCC Runtime Library Exception 3.1;
+  and zlib1.dll (zlib, above). The zip's licenses/ folder has every text.
 - BananaDS (third_party/bananads: the SuperDrastic repository, whose bananads/
   folder is BananaDS), Copyright (c) 2026 JorreFog and the SuperDrastic
   contributors, GNU GPL 3.0 or later - https://github.com/JorreFog/SuperDrastic

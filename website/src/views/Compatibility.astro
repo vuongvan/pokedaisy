@@ -2,9 +2,15 @@
 import Base from '../layouts/Base.astro';
 import Matrix from '../components/Matrix.astro';
 import RomCheck from '../components/RomCheck.astro';
-import data from '../data/compat.json';
+import BetaTag from '../components/BetaTag.astro';
+import release from '../data/compat.json';
+import { getBeta } from '../lib/betaRelease.js';
+import { withBeta } from '../lib/beta.js';
 
-const hacks = data.hacks;
+// The release's builds, then what only the newest beta reads (tagged BETA; a tap opens how to get it).
+const data = withBeta(release, (await getBeta())?.add);
+// DS hacks under a retail header (Origin HeartGold, Sacred Gold...) are ROM hacks too.
+const hacks = [...data.hacks, ...(data.dsHacks ?? [])];
 const retail = [...Object.entries(data.baseCodes).map(([code, title]) => ({ code, title, revs: null as number[] | null })), ...data.retail];
 import { trFor } from '../i18n/index.js';
 
@@ -42,7 +48,7 @@ const tr = trFor(Astro.url);
         <h3 class="vtitle">{tr('ROM HACKS')}</h3>
         <ul class="vlist">
           {hacks.map((h) => (
-            <li><span>{h.title.replace(/^Pokémon /, '')}</span><span class="vval">{h.version}</span></li>
+            <li><span>{h.title.replace(/^Pokémon /, '')}{h.beta && <BetaTag />}</span><span class="vval">{h.version}</span></li>
           ))}
         </ul>
       </article>
@@ -50,10 +56,10 @@ const tr = trFor(Astro.url);
         <h3 class="vtitle">{tr('ORIGINAL GAMES')}</h3>
         <p class="small muted">{tr('Retail dumps.')}</p>
         <ul class="vlist">
-          {data.gameBoy.map((g) => <li><span>{g.title}</span><span class="vval">{tr('GAME BOY')}</span></li>)}
-          {data.ds.map((g) => <li><span>{g.title}</span><span class="vval">DS · {g.code} · {tr('REV {n}', { n: g.rev })}</span></li>)}
+          {data.gameBoy.map((g: any) => <li><span>{g.title}{g.beta && <BetaTag />}</span><span class="vval">{tr('GAME BOY')}</span></li>)}
+          {data.ds.map((g: any) => <li><span>{g.title}{g.beta && <BetaTag />}</span><span class="vval">DS · {g.code} · {tr('REV {n}', { n: g.rev })}</span></li>)}
           {retail.map((r) => (
-            <li><span>{r.title}</span><span class="vval">{r.code}{r.revs && ` · ${tr('REV {n}', { n: r.revs.join('/') })}`}</span></li>
+            <li><span>{r.title}{(r as any).beta && <BetaTag />}</span><span class="vval">{r.code}{r.revs && ` · ${tr('REV {n}', { n: r.revs.join('/') })}`}</span></li>
           ))}
         </ul>
       </article>

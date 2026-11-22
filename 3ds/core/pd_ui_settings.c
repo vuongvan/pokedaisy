@@ -247,6 +247,8 @@ void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game
             const struct pd_option_row* row = &ui->optionSource->rows[i];
             ui_row(c, ix, ry, iw, row->label, row->value, false);
             if (i == selected) settings_outline(c, ix - 4, ry, iw + 8, ROW_H);
+            // A host-owned list's rows: a tap is the row (its info rows take none).
+            if (i >= infoCount) ui_add_hit(ui, ix - 4, ry, iw + 8, ROW_H, HIT_OPTION + (i - infoCount));
         }
         pd_unclip(c);
         if (hasBar)
@@ -260,6 +262,8 @@ void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game
     struct pd_settings* st = ui->settings;
     bool full = host && host->fullSettings;
     ui->viewExpand = host && host->hasExpand && host->expandGame;
+    ui->zoomCount = host ? host->zoomCount : 0;
+    ui->zoomLabels = host ? host->zoomLabels : NULL;
     if (full) group(c, ix, &y, "GAME");
     if (s->valid) {
         const char* place = pd_mapsec_name(g, s->mapsec);
@@ -347,10 +351,19 @@ void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game
                 pd_screen_mode_name(ui->pixelOff && st->screenMode == PD_SCREEN_PIXEL ? PD_SCREEN_SHARP_125 : st->screenMode));
     if (host && host->hasExpand) {
         if (host->expandGame) {
-            setting(ui, c, ix, &y, iw, SETTING_ASPECT, "ASPECT", pd_aspect_name(st->aspect));
-            // Two values: flips in place (the app's rule for pick-lists is more than two). Only
-            // ZOOM OUT has anything to step back from.
-            if (st->aspect == PD_ASPECT_ZOOM_OUT)
+            // ASPECT is the app's EXPAND on / off (two values, so it flips in place); ZOOM steps the view out
+            // (the app's SETTINGS > SCREEN > ZOOM), and only then is there anything for AUTO ZOOM IN to do.
+            const bool zoomRow = host->zoomCount > 1 && host->zoomLabels;
+            const bool expanded = st->aspect != PD_ASPECT_ORIGINAL;
+            setting(ui, c, ix, &y, iw, SETTING_ASPECT, "ASPECT",
+                    zoomRow ? (expanded ? "EXPAND" : "ORIGINAL") : pd_aspect_name(st->aspect));
+            if (zoomRow && expanded) {
+                int z = st->zoom < 0 ? 0 : st->zoom >= host->zoomCount ? host->zoomCount - 1 : st->zoom;
+                setting(ui, c, ix, &y, iw, SETTING_ZOOM, "ZOOM", host->zoomLabels[z]);
+            }
+            // AUTO ZOOM IN sits right under ZOOM whenever EXPAND is on (the app's SCREEN group): at 1x it has no step to
+            // take yet, and at the first one it is already there.
+            if (expanded && (st->aspect == PD_ASPECT_ZOOM_OUT || zoomRow))
                 setting(ui, c, ix, &y, iw, SETTING_AUTO_ZOOM, "AUTO ZOOM IN", st->autoZoom ? "ON" : "OFF");
         } else {
             // This game's overworld can't be rebuilt: shown, not tappable.
@@ -374,7 +387,7 @@ void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game
             setting(ui, c, ix, &y, iw, SETTING_FLY_ON, "FLY ON", flight_vehicle_label(st->flightVehicle));
     }
     if (host && host->hasButtonRows) {
-        static const char* const NAMES[PD_BUTTONS] = {"X", "Y", "L2", "R2", "NONE"};
+        static const char* const NAMES[PD_BUTTONS] = {"X", "Y", "L2", "R2", "NONE", "L3"};
         setting(ui, c, ix, &y, iw, SETTING_QUICK_BTN, "QUICK MENU BUTTON", NAMES[st->quickBtn]);
         setting(ui, c, ix, &y, iw, SETTING_COMPANION_BTN, "COMPANION BUTTON", NAMES[st->companionBtn]);
         if (host->hasHud) setting(ui, c, ix, &y, iw, SETTING_HUD_BTN, "HUD CURSOR BUTTON", NAMES[st->hudBtn]);
@@ -655,6 +668,10 @@ void ui_overlay(struct pd_ui* ui, struct pd_canvas* c) {
     case PD_OVERLAY_PICK_ASPECT:
         pick_list(ui, c, "ASPECT", ASPECT_NAMES, PD_ASPECTS, ui->settings->aspect);
         break;
+    case PD_OVERLAY_PICK_ZOOM:
+        if (ui->zoomCount > 0 && ui->zoomLabels)
+            pick_list(ui, c, "ZOOM", ui->zoomLabels, ui->zoomCount, ui->settings->zoom);
+        break;
     case PD_OVERLAY_PICK_VIEW: {
         const bool expand = ui->viewExpand;
         pick_list(ui, c, "VIEW", VIEW_NAMES, pd_view_count(expand), pd_view_of(ui->settings, expand));
@@ -736,9 +753,14 @@ void pd_ui_options_view(struct pd_ui* ui,struct pd_canvas* c,const struct pd_gam
     ui_settings_tab(ui,c,g,s,NULL);
 }
 
-void pd_ui_choices_view(struct pd_canvas* c,const char* title,const char* const* choices,int count,int selected){
+void pd_ui_choices_view_ui(struct pd_ui* ui,struct pd_canvas* c,const char* title,const char* const* choices,int count,int selected){
     if(count<1 || count>8)return;
-    struct pd_ui ui={0};ui.pressedId=-1;
+    ui->pressedId=-1;ui->hitCount=0;
     pd_dim(c,230);
-    pick_list(&ui,c,title,choices,count,selected);
+    pick_list(ui,c,title,choices,count,selected);
+}
+
+void pd_ui_choices_view(struct pd_canvas* c,const char* title,const char* const* choices,int count,int selected){
+    struct pd_ui ui={0};
+    pd_ui_choices_view_ui(&ui,c,title,choices,count,selected);
 }

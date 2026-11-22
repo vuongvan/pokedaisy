@@ -238,7 +238,13 @@ fun AchievementsScreen(
                 tr("RetroAchievements matches a ROM by its exact hash. Retail games and some popular hacks have sets; a patched or rebuilt ROM usually doesn't."),
                 m, small, detail = game.hash?.let { tr("HASH {0}", it.uppercase()) },
             )
-            state.achievements.isEmpty() -> Message(tr("LOADING ACHIEVEMENTS"), "${game.title.orEmpty()}", m, small, loading = true)
+            // A game RetroAchievements knows with no set made yet (Heart and Soul, GitHub #1178): it loaded with none.
+            game.total == 0 && state.leaderboards.isEmpty() -> Message(
+                tr("NO ACHIEVEMENTS YET"),
+                tr("RetroAchievements knows this game, but nobody has made achievements for it yet."),
+                m, small, detail = game.title,
+            )
+            state.achievements.isEmpty() && game.total > 0 -> Message(tr("LOADING ACHIEVEMENTS"), "${game.title.orEmpty()}", m, small, loading = true)
             showBoards && state.leaderboards.isNotEmpty() -> LeaderboardList(
                 state.leaderboards, game, m, small, Modifier.weight(1f),
                 onAchievements = { showBoards = false },

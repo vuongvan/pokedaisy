@@ -48,7 +48,9 @@
 
 using namespace melonDS;
 
-static void expShareTick(void);   // EXP SHARE, after every frame (below)
+extern "C" {
+static void expShareTick(void);   // EXP SHARE, after every frame (below; the definition is in the C API block)
+}
 
 namespace {
 
@@ -289,6 +291,27 @@ void pk_ndsm_deinit(void)
 
 bool pk_ndsm_active(void) { return ds != nullptr; }
 
+const uint8_t* pk_ndsm_save_data(void)
+{
+    return ds && ds->nds ? ds->nds->GetNDSSave() : nullptr;
+}
+
+uint32_t pk_ndsm_save_length(void)
+{
+    return ds && ds->nds ? ds->nds->GetNDSSaveLength() : 0;
+}
+
+// melonDS's main RAM: the DS companion reads the save out of it (android's companion does the same).
+const uint8_t* pk_ndsm_main_ram(void)
+{
+    return ds && ds->nds ? ds->nds->MainRAM : nullptr;
+}
+
+uint32_t pk_ndsm_main_ram_size(void)
+{
+    return ds && ds->nds ? ds->nds->MainRAMMask + 1 : 0;
+}
+
 void pk_ndsm_set_keys(uint32_t keys)
 {
     if (ds) ds->keys = keys & 0xFFF;
@@ -405,9 +428,9 @@ int pk_ndsm_finish_save(int maxFrames)
     return n;
 }
 
-bool pk_ndsm_save_state(const char* path)
+// A state as its file holds it: the header (magic, version, the save's CRC and length), then melonDS's own.
+static bool stateBytes(std::vector<u8>& out)
 {
-    if (!ds) return false;
     Savestate st;
     pk_nds_wide_sync();
     setArm9Shift(1);
@@ -418,11 +441,85 @@ bool pk_ndsm_save_state(const char* path)
     const u8* save = ds->nds->GetNDSSave();
     u32 saveLen = ds->nds->GetNDSSaveLength();
     u32 header[4] = {STATE_MAGIC, STATE_VERSION, save ? saveCrc(save, saveLen) : 0, saveLen};
+    out.resize(sizeof(header) + st.Length());
+    memcpy(out.data(), header, sizeof(header));
+    memcpy(out.data() + sizeof(header), st.Buffer(), st.Length());
+    return true;
+}
+
+bool pk_ndsm_save_state(const char* path)
+{
+    if (!ds) return false;
+    std::vector<u8> bytes;
+    if (!stateBytes(bytes)) return false;
     FILE* f = fopen(path, "wb");
     if (!f) return false;
-    bool ok = fwrite(header, sizeof(header), 1, f) == 1 && fwrite(st.Buffer(), 1, st.Length(), f) == st.Length();
+    bool ok = fwrite(bytes.data(), 1, bytes.size(), f) == bytes.size();
     ok = fclose(f) == 0 && ok;
     return ok;
+}
+
+size_t pk_ndsm_state_mem(uint8_t* out, size_t cap)
+{
+    if (!ds) return 0;
+    std::vector<u8> bytes;
+    if (!stateBytes(bytes)) return 0;
+    if (out) {
+        if (bytes.size() > cap) return 0;
+        memcpy(out, bytes.data(), bytes.size());
+    }
+    return bytes.size();
+}
+
+// [keepSave]: the battery save the console holds now stays (a libretro frontend's state, REWIND, the quick menu's LOAD
+// STATE: the frontend owns the save file); else the state's copy goes back, and to the file, as the app's states do.
+static bool loadStateBytes(const u8* data, size_t len, bool keepSave)
+{
+    if (!data || len < 16) return false;
+    u32 header[4];
+    memcpy(header, data, sizeof(header));
+    if (header[0] != STATE_MAGIC) return false;
+    std::vector<u8> battery, copy;
+    bool dirty = false;
+    if (keepSave) {
+        if (const u8* mem = ds->nds->GetNDSSave()) battery.assign(mem, mem + ds->nds->GetNDSSaveLength());
+        copy = ds->saveCopy;   // melonDS reports the state's save memory as a write while it loads (onSave): undone below
+        dirty = ds->saveDirty;
+    }
+    // melonDS's own length (its header's word at +8) over the bytes given: a libretro frontend hands back the size it
+    // was told (retro_serialize_size), padded past the state, and melonDS refuses any other length.
+    u32 melonLen = (u32) (len - 16);
+    if (len >= 16 + 12) {
+        u32 own;
+        memcpy(&own, data + 16 + 8, sizeof(own));
+        if (own >= 12 && own <= melonLen) melonLen = own;
+    }
+    Savestate st(const_cast<u8*>(data) + 16, melonLen, false);
+    pk_nds_wide_sync();
+    setArm9Shift(1);
+    bool loaded = !st.Error && ds->nds->DoSavestate(&st) && !st.Error;
+    setArm9Shift(boostShift());
+    if (!loaded) return false;
+    pk_nds_call_reset();
+    if (keepSave) {
+        u8* mem = const_cast<u8*>(ds->nds->GetNDSSave());
+        if (mem && battery.size() == ds->nds->GetNDSSaveLength()) memcpy(mem, battery.data(), battery.size());
+        else if (!battery.empty()) ds->nds->SetNDSSave(battery.data(), (u32) battery.size());
+        ds->saveCopy = std::move(copy);
+        ds->saveDirty = dirty;
+    } else if (const u8* mem = ds->nds->GetNDSSave()) {
+        // The state put its save memory back: the file follows, as on the GBA.
+        ds->saveCopy.assign(mem, mem + ds->nds->GetNDSSaveLength());
+        ds->saveDirty = true;
+        pk_ndsm_flush_save();
+    }
+    setClock();
+    return true;
+}
+
+bool pk_ndsm_load_state_mem_keeping_save(const uint8_t* data, size_t len)
+{
+    return ds && loadStateBytes(data, len, true);
 }
 
 bool pk_ndsm_load_state(const char* path)
@@ -430,26 +527,10 @@ bool pk_ndsm_load_state(const char* path)
     if (!ds) return false;
     std::vector<u8> data;
     if (!readFile(path, data) || data.size() < 16) return false;
-    u32 header[4];
-    memcpy(header, data.data(), sizeof(header));
-    if (header[0] != STATE_MAGIC) return false;
-    Savestate st(data.data() + 16, (u32) (data.size() - 16), false);
-    pk_nds_wide_sync();
-    setArm9Shift(1);
-    bool loaded = !st.Error && ds->nds->DoSavestate(&st) && !st.Error;
-    setArm9Shift(boostShift());
-    if (!loaded) {
+    if (!loadStateBytes(data.data(), data.size(), false)) {
         LOGE("loadstate failed: %s", path);
         return false;
     }
-    pk_nds_call_reset();
-    // The state put its save memory back: the file follows, as on the GBA.
-    if (const u8* mem = ds->nds->GetNDSSave()) {
-        ds->saveCopy.assign(mem, mem + ds->nds->GetNDSSaveLength());
-        ds->saveDirty = true;
-        pk_ndsm_flush_save();
-    }
-    setClock();
     return true;
 }
 

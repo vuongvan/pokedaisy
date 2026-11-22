@@ -3,6 +3,7 @@
 // Titles, labels and buttons are in the app's pixel font (Pixel Operator); reading text is Atkinson Hyperlegible,
 // the manual's. A dark page follows the visitor's system setting, or the header's switch once they've used it.
 import Pixel from '../components/Pixel.astro';
+import BetaModal from '../components/BetaModal.astro';
 import DownloadModal from '../components/DownloadModal.astro';
 import { frameCss, spriteSvg } from '../lib/pixel.js';
 import { THEMES, themeCss, siteDarkCss, SITE_DARK } from '../lib/themes.js';
@@ -208,6 +209,7 @@ const petals = [[4, 22, 1, 0, 22], [91, 10, 2, 4, 26], [70, 62, 1, 9, 24], [10, 
 
     <main><slot /></main>
     <DownloadModal />
+    <BetaModal />
 
     <footer class="footer">
       <div class="container foot">

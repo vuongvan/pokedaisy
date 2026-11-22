@@ -55,6 +55,8 @@ The funnel button opens a filter: `SHOW ALL`, `LOCKED ONLY` or `UNLOCKED ONLY`.
 
 If the tab says `NO ACHIEVEMENTS FOR THIS ROM`, RetroAchievements doesn't know this exact file. It shows the ROM's hash, which you can look up on the site.
 
+If it says `NO ACHIEVEMENTS YET`, RetroAchievements knows the game, but nobody has made achievements for it so far.
+
 ## Popups
 
 Achievement news pops up at the top of the companion, over whatever tab you're on:

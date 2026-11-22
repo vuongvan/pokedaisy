@@ -1,7 +1,7 @@
 // The homepage's DOWNLOAD cards: every platform PokeDaisy ships on, each with its files and its install guide.
 // A file is looked up by name in the newest release that has it (getReleases: published, not pre-releases), so a
 // platform's files show up by themselves once a release carries them (docs/RELEASING.md's list); until then the row
-// reads SOON. Windows and iOS are on the way: a card with no files.
+// reads SOON. iOS is on the way: a card with no files.
 import { msg } from '../i18n/index.js';
 
 /**
@@ -36,7 +36,13 @@ export const PLATFORMS = [
       { match: 'pokedaisy.cia', icon: 'n3ds', label: msg('The app for the HOME Menu (.cia)') },
     ],
   },
-  { id: 'windows', name: 'WINDOWS', icon: 'windows', soon: true, files: [] },
+  {
+    id: 'windows', name: 'WINDOWS', icon: 'windows', guide: '/docs/windows-install/',
+    text: msg('Windows 10 or 11, on a 64-bit PC.'),
+    files: [
+      { match: (n) => /^PokeDaisy-.+-windows-x86_64\.zip$/.test(n), icon: 'pc', label: msg('Windows PCs') },
+    ],
+  },
   { id: 'ios', name: 'IOS', icon: 'iphone', soon: true, files: [] },
 ];
 

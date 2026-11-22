@@ -248,6 +248,73 @@ index e14a553..fdb7fc7 100644
 +    "GBA BIOS added and on. New GBA games start with the logo." to Tr(ja = "GBA BIOSを ついかして オンに しました。 あたらしい GBAゲームは ロゴから はじまります。", fr = "BIOS GBA ajouté et activé. Les nouveaux jeux GBA démarrent avec le logo.", de = "GBA-BIOS hinzugefügt und aktiviert. Neue GBA-Spiele starten mit dem Logo.", it = "BIOS GBA aggiunto e attivato. I nuovi giochi GBA partono con il logo.", es = "BIOS de GBA añadido y activado. Los juegos de GBA nuevos empiezan con el logo.", br = "BIOS do GBA adicionada e ativada. Novos jogos de GBA começam com o logo.", pt = "BIOS do GBA adicionada e ativada. Os novos jogos GBA começam com o logo.", ko = "GBA BIOS를 추가하고 켰습니다. 새 GBA 게임은 로고와 함께 시작됩니다."),
 +    "GBA BIOS added and on. It isn't the usual retail file, but it looks like a GBA BIOS." to Tr(ja = "GBA BIOSを ついかして オンに しました。 ふつうの せいひんばんの ファイルでは ありませんが、 GBA BIOSに みえます。", fr = "BIOS GBA ajouté et activé. Ce n'est pas le fichier commercial habituel, mais il ressemble à un BIOS GBA.", de = "GBA-BIOS hinzugefügt und aktiviert. Es ist nicht die übliche Handelsversion, sieht aber wie ein GBA-BIOS aus.", it = "BIOS GBA aggiunto e attivato. Non è il solito file commerciale, ma sembra un BIOS GBA.", es = "BIOS de GBA añadido y activado. No es el archivo comercial habitual, pero parece un BIOS de GBA.", br = "BIOS do GBA adicionada e ativada. Não é o arquivo comercial usual, mas parece uma BIOS de GBA.", pt = "BIOS do GBA adicionada e ativada. Não é o ficheiro comercial habitual, mas parece uma BIOS de GBA.", ko = "GBA BIOS를 추가하고 켰습니다. 일반 정식 파일은 아니지만 GBA BIOS처럼 보입니다."),
  )
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/GameScreenState.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/GameScreenState.kt
+index 0a1c05b..71a1fe3 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/GameScreenState.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/GameScreenState.kt
+@@ -130,7 +130,7 @@ data class GameScreenFrames(
+ )
+ 
+ fun gameScreenFrames(width: Int, height: Int, gameHeight: Int, gripHeight: Int,
+-                     side: SidePanelState, portrait: PortraitPanelState): GameScreenFrames {
++                     side: SidePanelState, portrait: PortraitPanelState, gripHidden: Boolean = false): GameScreenFrames {
+     val w = width.coerceAtLeast(0)
+     val h = height.coerceAtLeast(0)
+     fun rect(top: Int, bottom: Int, right: Int = w, left: Int = 0) = Rect(
+@@ -152,8 +152,12 @@ fun gameScreenFrames(width: Int, height: Int, gameHeight: Int, gripHeight: Int,
+         // Keep a hidden companion measured at its saved positive size so its navigation and scroll state survive.
+         val visible = if (hidden) PortraitLayout.arrange(w, h, gameHeight, gripHeight, portrait.ratio,
+             portrait.underGame, portrait.expand, portrait.padStrip) else a
++        // A grip that isn't drawn leaves its strip to the companion: it runs up to the touch controls (or, under the game, down to them).
++        val strip = if (gripHidden && !hidden) gripHeight else 0
++        val companionTop = if (visible.grip == PortraitLayout.Grip.ABOVE) visible.companionTop - strip else visible.companionTop
++        val companionBottom = visible.companionTop + visible.companionHeight + if (visible.grip == PortraitLayout.Grip.BELOW) strip else 0
+         return GameScreenFrames(rect(0, a.gameAreaBottom), rect(a.padTop, a.padBottom),
+-            rect(visible.companionTop, visible.companionTop + visible.companionHeight), !hidden, a)
++            rect(companionTop, companionBottom), !hidden, a)
+     }
+     val a = side.arrange(w)
+     val panel = if (side.isWindow) rect(0, h) else rect(0, h, left = w - a.panelWidth)
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/PortraitPanel.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/PortraitPanel.kt
+index 3d2e61e..e5f104c 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/PortraitPanel.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/PortraitPanel.kt
+@@ -183,7 +183,7 @@ val LocalCompanionTopInset = compositionLocalOf { 0 }
+  * tap steps through the sizes ([PortraitLayout.next]).
+  */
+ @Composable
+-fun PortraitGrip(grip: PortraitLayout.Grip = PortraitLayout.Grip.ABOVE, onClick: () -> Unit) {
++fun PortraitGrip(grip: PortraitLayout.Grip = PortraitLayout.Grip.ABOVE, visible: Boolean = true, onClick: () -> Unit) {
+     val m = rememberGbaTextMetrics()
+     val u = m.u
+     val noRipple = remember { MutableInteractionSource() }
+@@ -191,15 +191,23 @@ fun PortraitGrip(grip: PortraitLayout.Grip = PortraitLayout.Grip.ABOVE, onClick:
+         contentAlignment = Alignment.Center,
+         modifier = Modifier
+             .size(u * 48, u * 24)
+-            .drawBehind {
++            // [visible] false: nothing drawn, the same place and size still drags and taps (the companion fills its strip).
++            .then(if (!visible) Modifier else Modifier.drawBehind {
+                 drawLayeredBox(
+                     OptionColors.titleLayers.inPx(u.toPx()), OptionColors.titleFill, radius = 3 * u.toPx(),
+                     openBottom = grip == PortraitLayout.Grip.ABOVE, openTop = grip == PortraitLayout.Grip.BELOW,
+                 )
+-            }
++            })
+             .semantics { contentDescription = tr("Resize the companion") }
+             .soundClickable(interactionSource = noRipple, indication = null, onClick = onClick),
+     ) {
+-        ShadowedPixelIcon(PixelIcons.resizeVertical, OptionColors.label, OptionColors.labelShadow, m)
++        if (visible) ShadowedPixelIcon(PixelIcons.resizeVertical, OptionColors.label, OptionColors.labelShadow, m)
+     }
+ }
++
++/**
++ * The upright companion's grip is drawn only while the companion is hidden (the way to bring it back): a shown one has no
++ * tab, its strip (the black band between the touch controls and the companion) belongs to the companion, flush against the
++ * controls, and the same spot still drags to resize and taps through the sizes. false = the tab and its band, as before.
++ */
++const val PORTRAIT_GRIP_HIDDEN = true
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/SettingRows.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/SettingRows.kt
 index 7372d56..4aa4935 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/SettingRows.kt
@@ -260,6 +327,51 @@ index 7372d56..4aa4935 100644
      "IMPORT SKIN" to "touch controls skin skins deltaskin delta add install controller picture",
      "GAME BUTTONS" to "key bindings keybinds keybinding controls remap remapping rebind mapping input controller gamepad buttons turbo start 2 select 2 x y ds nds game boy gba to companion d-pad dpad directions up down left right arrows 8bitdo micro keyboard mode",
      "HOTKEYS" to "shortcuts combos save state load state slot rewind fast forward key bindings restart close quit exit app companion open panel window",
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/SharedGameScreen.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/SharedGameScreen.kt
+index d778321..4f6feef 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/SharedGameScreen.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/SharedGameScreen.kt
+@@ -43,6 +43,8 @@ fun GameScreen(
+     val portrait = state.portrait
+     val reveal by animateFloatAsState(if (side.shown) 1f else 0f,
+         tween(if (side.isWindow) 120 else 160), label = "companionVisibility")
++    // The tab is drawn only while the companion is hidden (it's how it comes back); see PORTRAIT_GRIP_HIDDEN.
++    val gripHidden = PORTRAIT_GRIP_HIDDEN && portrait.enabled && !(portrait.hidden && portrait.canHide)
+     val sideTabs = !portrait.enabled && side.enabled && !side.isWindow && side.book == null && (side.open || reveal > 0f)
+     val minimum = LocalViewConfiguration.current.minimumTouchTargetSize
+     val reserved = remember { arrayOf(emptyList<Rect>()) }
+@@ -67,8 +69,7 @@ fun GameScreen(
+             if (portrait.enabled && portrait.hinge == null) {
+                 PanelResizeHandle(true, state::startPortraitDrag, state::dragPortrait, state::finishPortraitDrag) {
+                     // The placement depends on the same arrangement as the companion below.
+-                    PortraitGrip(state.gripPlacement,
+-                        state::stepPortrait)
++                    PortraitGrip(state.gripPlacement, visible = !gripHidden, onClick = state::stepPortrait)
+                 }
+             }
+         }
+@@ -98,7 +99,7 @@ fun GameScreen(
+         val open = items[7].measure(loose)
+         val gh = gameHeight(w)
+         state.width = w; state.height = h; state.gameHeight = gh; state.gripHeight = grip.height
+-        val frames = gameScreenFrames(w, h, gh, grip.height, side, portrait)
++        val frames = gameScreenFrames(w, h, gh, grip.height, side, portrait, gripHidden)
+         state.gripPlacement = frames.portrait?.grip ?: PortraitLayout.Grip.ABOVE
+         val full = Rect(0f, 0f, w.toFloat(), h.toFloat())
+         fun measured(index: Int, rect: Rect) = items[index].measure(Constraints.fixed(
+diff --git a/docs/manual/devices.md b/docs/manual/devices.md
+index 5981bf1..824a75c 100644
+--- a/docs/manual/devices.md
++++ b/docs/manual/devices.md
+@@ -139,7 +139,7 @@ Hold `BACK` to leave the game, as always.
+ 
+ Hold a phone upright and the game sits across the top of the screen, with the companion docked below it and the touch controls under that. It's open until you hide it: there's nothing to slide in. In a DS game the touch screen takes the companion's place, between the top screen and the buttons.
+ 
+-- **Change its height:** drag the grip on the companion's top edge up or down. It snaps to the default size (the shape of the Thor's bottom screen) and to the largest size (everything under the game).
++- **Change its height:** drag the grip on the companion's top edge up or down. While the companion is shown the grip isn't drawn (the companion runs right up to the touch controls); it is still there, in the top middle of the companion, where the tab used to be. It snaps to the default size (the shape of the Thor's bottom screen) and to the largest size (everything under the game).
+ - **Step through sizes:** tap the grip to go from small, to the default, to everything under the game, then to hidden, and round again. When the space under the game only fits the smallest size, a tap switches between shown and hidden.
+ - **Hide it:** with the companion hidden, the game has the screen to itself and only the grip stays, along the bottom. Tap it, drag it, or press the `COMPANION` hotkey to bring the companion back.
+ - **Touch controls:** they get the space at the bottom of the screen, under the companion. With the companion `AT BOTTOM` (below) they go in the gap between the game and the companion when there's room, and lie over the game when there isn't. The phone held upright has its own layout, and `POSITION` on the `TOUCH CONTROLS` page puts the buttons at the top, middle or bottom of their space; see [Touch controls](controls.md#touch-controls).
 diff --git a/docs/manual/settings-reference.md b/docs/manual/settings-reference.md
 index 42b9bb1..820e9a5 100644
 --- a/docs/manual/settings-reference.md

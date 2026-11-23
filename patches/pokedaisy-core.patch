@@ -1,0 +1,180 @@
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/GameOptions.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/GameOptions.kt
+index 4a88b91..2174594 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/GameOptions.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/GameOptions.kt
+@@ -198,7 +198,7 @@ class GameOptions internal constructor(
+                 runCatching { HmFree.find(path) }.getOrNull(),
+                 runCatching { ExpShare.find(path) }.getOrNull(),
+                 runCatching { LevelCap.find(path) }.getOrNull(),
+-                runCatching { PokemonCenter.find(path) }.getOrNull())
++                runCatching { PokemonCenter.find(path) ?: PokemonCenter.findHealOnly(path, PokemonCenter.HEAL_ONLY_CANDIDATES) }.getOrNull())
+             withContext(publish) {
+                 if (closed.value || ticket != generation.value || !allowed()) return@withContext
+                 found.value = result
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/Gen3Mon.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/Gen3Mon.kt
+index 90843e9..513f332 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/data/Gen3Mon.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/Gen3Mon.kt
+@@ -93,6 +93,8 @@ data class PartyMonLayout(
+     /** A plaintext box's attacks are bit fields ([plainAttacks]): SoulGold v1.2.1's four 11-bit moves at bits 0, 16, 32
+      * and 43 (move 4 across the third and fourth u16), and the PP four 7-bit fields of the u32 after them. */
+     val packedAttacks: Boolean = false,
++    /** Where a plaintext box's IV word is, from [plainBox] (vanilla's Misc +4 is 0x28; SoulGold v1.2.1's is 0x20). */
++    val plainIvWord: Int = 0x28,
+ )
+ 
+ val VANILLA_PARTY_MON = PartyMonLayout()
+@@ -297,7 +299,7 @@ fun decodePartyMon(raw: ByteArray, off: Int, layout: PartyMonLayout = VANILLA_PA
+         pp = p
+         // Plaintext boxes keep the substructs in G-A-E-M order: EVs at +0x18, IVs at Misc +4.
+         evs = List(6) { raw[box + 0x18 + it].toInt() and 0xFF }
+-        ivWord = u32(raw, box + 0x28)
++        ivWord = u32(raw, box + layout.plainIvWord)
+         if (layout.plainExp) exp = u32(raw, box + 4)
+     }
+     if (species == 0) return null
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/MoveAdvice.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/MoveAdvice.kt
+index b4d701b..3aacb32 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/data/MoveAdvice.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/MoveAdvice.kt
+@@ -29,6 +29,8 @@ private val BY_TYPE = setOf(
+ /** [mv]'s category, null where the game's rule isn't known. Gen 4 and 5 keep one on each move ([dsSpecialMoves],
+  * [dsStatusMoves]); before that it went by the move's type. */
+ fun moveKind(mv: MoveView): MoveKind? = when {
++    // A game with the split on each move, from its ROM ([RomExtras.moveKinds]).
++    romExtras(activeGame)?.moveKinds != null -> kindOfDigit(romExtras(activeGame)?.moveKinds?.getOrNull(mv.id))
+     activeGame.isDsGame -> when {
+         // Renegade Platinum moved a few moves between categories: its cart's own.
+         renegadePlatinum && activeGame == GameKind.PLATINUM -> RenegadePlatinum.data?.moveCategories?.get(mv.id)?.let {
+@@ -60,7 +62,8 @@ fun moveKind(mv: MoveView): MoveKind? = when {
+ 
+ /** [id]'s [MoveStats]; null where the running game's moves aren't the original games'. A randomized retail ROM's
+  * ([runningRandomized]) are its own, read from it. */
+-fun moveStats(id: Int): MoveStats? = if (!movesAreVanilla) null
++fun moveStats(id: Int): MoveStats? = if (romExtras(activeGame)?.moveStats != null) romExtras(activeGame)?.moveStats?.getOrNull(id)?.takeIf { id > 0 }
++    else if (!movesAreVanilla) null
+     else runningRandomized?.moveStats?.let { it.getOrNull(id)?.takeIf { id > 0 } }
+     // Emerald Legacy rebalanced ~130 moves (accuracy, PP, a few effects): its own table, read from its ROM.
+     ?: (if (emeraldLegacy) moveStatsEmeraldLegacy else vanillaMoveStats).getOrNull(id)?.takeIf { id > 0 }
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/PokemonCenter.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/PokemonCenter.kt
+index b434241..b579f11 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/data/PokemonCenter.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/PokemonCenter.kt
+@@ -138,6 +138,52 @@ object PokemonCenter {
+         )
+     }
+ 
++    /**
++     * HEAL alone, for a build whose code the signatures above don't know (SoulGold: pokeemerald-expansion, built by a newer gcc,
++     * no source). gSpecials' first entry is HealPlayerParty in every build, and [fns]' own addresses name what it must do: call
++     * GetMonData and SetMonData ([PartyItemFns]) and hold gPlayerPartyCount in its literals. A build that matches all three
++     * gets the nurse's special at index 0 and Emerald's jingle (a wrong song id only silences it); one that doesn't gets null.
++     * The Name Rater, the Move Deleter and the Move Tutor are left out (nothing here knows their specials). Played headless on
++     * SoulGold v1.2.1: the script ran ScriptContext_SetupScript on the field, both damaged party Pokémon came back to full HP.
++     */
++    fun healOnly(rom: LittleEndianReader, fns: FieldItemFns): Found? {
++        val pc = fns.pc ?: return null
++        val party = fns.party ?: return null
++        val table = (pc.specials - 0x08000000L).toInt()
++        if (table < 0 || table + 4 > rom.limit()) return null
++        val entry = word(rom, table)
++        if (!isThumbRom(entry)) return null
++        val f = fn(entry)
++        if (f + 0x240 > rom.limit()) return null
++        var getMon = false
++        var setMon = false
++        var countLiteral = false
++        var o = 0
++        while (o < 0x200) {
++            val h1 = rom.getShort(f + o).toInt() and 0xFFFF
++            val h2 = rom.getShort(f + o + 2).toInt() and 0xFFFF
++            if (h1 and 0xF800 == 0xF000 && h2 and 0xF800 == 0xF800) {
++                var off = ((h1 and 0x7FF) shl 12) or ((h2 and 0x7FF) shl 1)
++                if (off and (1 shl 22) != 0) off -= 1 shl 23
++                val target = 0x08000000L + f + o + 4 + off
++                if (target == party.getMonData) getMon = true
++                if (target == party.setMonData) setMon = true
++            }
++            if (o and 3 == 0 && word(rom, f + o) == party.partyCount) countLiteral = true
++            o += 2
++        }
++        if (!getMon || !setMon || !countLiteral) return null
++        return Found(pc.specials, 0, null, null, null, null, null, 0L, 0L, 368, 378)
++    }
++
++    /** [healOnly] for the first of [candidates] that matches the ROM at [rom]; null if none. Off the UI thread. */
++    fun findHealOnly(rom: Path, candidates: List<FieldItemFns>): Found? = runCatching {
++        withRomFile(rom) { f -> val r = FileLittleEndian(f); candidates.firstNotNullOfOrNull { healOnly(r, it) } }
++    }.getOrNull()
++
++    /** The builds [findHealOnly] tries: the ones each game's [RomExtras.healOnly] names (RomExtrasRegistry.kt). */
++    val HEAL_ONLY_CANDIDATES: List<FieldItemFns> by lazy { ROM_EXTRAS.flatMap { it.healOnly() } }
++
+     /** Every ROM offset (2-byte steps) [s] matches at. */
+     private fun scan(rom: LittleEndianReader, s: IntArray): List<Int> {
+         val out = ArrayList<Int>()
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomExtras.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomExtras.kt
+new file mode 100644
+index 0000000..36303f1
+--- /dev/null
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomExtras.kt
+@@ -0,0 +1,25 @@
++package com.pokedaisy.app.companion.data
++
++/**
++ * What one game's ROM adds to the shared tables, read from the ROM (a generator script) or checked on it: one [RomExtras] per
++ * game build family, in its own file (RomSoulGold.kt, RomQuetzal.kt...), listed in [ROM_EXTRAS] (RomExtrasRegistry.kt). The shared
++ * code asks [romExtras] for the running game, so a new ROM is its own files plus one line of the registry (docs/ROM_EXTRAS.md).
++ */
++class RomExtras(
++    val kind: GameKind,
++    /** Each move's accuracy, PP, side effect chance, priority and effect name (what [moveEffectWords] knows), index = move id. */
++    val moveStats: List<MoveStats>? = null,
++    /** One digit per move id: 0 physical, 1 special, 2 status, for a game with the split on each move. */
++    val moveKinds: String? = null,
++    /** Field-function sets of builds whose gSpecials starts with HealPlayerParty: CENTER is offered as HEAL only on a match
++     * ([PokemonCenter.healOnly]). */
++    val healOnly: () -> List<FieldItemFns> = { emptyList() },
++)
++
++/** The extras of [kind], or null. */
++fun romExtras(kind: GameKind?): RomExtras? = if (kind == null) null else ROM_EXTRAS.firstOrNull { it.kind == kind }
++
++/** The category a generated table's digit names: 0 physical, 1 special, 2 status. */
++internal fun kindOfDigit(c: Char?): MoveKind? = when (c) {
++    '0' -> MoveKind.PHYSICAL; '1' -> MoveKind.SPECIAL; '2' -> MoveKind.STATUS; else -> null
++}
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomExtrasRegistry.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomExtrasRegistry.kt
+new file mode 100644
+index 0000000..66ec92a
+--- /dev/null
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomExtrasRegistry.kt
+@@ -0,0 +1,28 @@
++package com.pokedaisy.app.companion.data
++
++/**
++ * Every game with [RomExtras]. One slot per game, each a marker comment and its entry, with blank comment lines between so a
++ * game's patch touches nothing of another's: a new game adds its own slot at the end (docs/ROM_EXTRAS.md).
++ */
++internal val ROM_EXTRAS: List<RomExtras> = listOfNotNull(
++    //
++    //
++    //
++    //
++    //
++    //
++    // ---- slots below: soulgold ---------------------------------------------------------------
++    //
++    //
++    //
++    //
++    //
++    //
++    // ---- slots below: quetzal ----------------------------------------------------------------
++    //
++    //
++    //
++    //
++    //
++    //
++)

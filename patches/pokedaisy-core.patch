@@ -11,6 +11,32 @@ index 4a88b91..2174594 100644
              withContext(publish) {
                  if (closed.value || ticket != generation.value || !allowed()) return@withContext
                  found.value = result
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemSupportCache.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemSupportCache.kt
+index 4d1c746..695170f 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemSupportCache.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemSupportCache.kt
+@@ -24,7 +24,7 @@ class FieldItemSupportCache(private val reader: MemoryReader = InProcessReader)
+             candidates.firstNotNullOfOrNull { fieldItemSupport(it, reader::readCoreMemory, mailboxFor(it, cfg, game)) }
+         }.getOrElse { return null }
+         cached = key to support
+-        FlyWithoutMoveGame.active = support?.canFly == true && support.fns.fly?.withoutMove != null
++        FlyWithoutMoveGame.active = support?.canFly == true && (support.fns.fly?.withoutMove != null || romExtras(activeGame)?.flyAnyMon == true)
+         return support
+     }
+ }
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/Fly.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/Fly.kt
+index 2ccb81b..6231e24 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/data/Fly.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/Fly.kt
+@@ -248,7 +248,7 @@ private fun flyer(fns: FieldItemFns, fly: FlyFns, g: GameCalls): Pair<Int, Long>
+             return slot to g.call(p.getMonData, mon, GET_MON_PERSONALITY)
+         }
+     }
+-    val slot = fly.withoutMove?.let { w -> withoutMoveFlyer(fns, w, mons, g) } ?: mons.firstOrNull()?.takeIf { HmFree.active }
++    val slot = fly.withoutMove?.let { w -> withoutMoveFlyer(fns, w, mons, g) } ?: mons.firstOrNull()?.takeIf { HmFree.active || romExtras(activeGame)?.flyAnyMon == true }
+         ?: return null
+     return slot to g.call(p.getMonData, (p.party + slot * p.monStride).toInt(), GET_MON_PERSONALITY)
+ }
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/Gen3Mon.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/Gen3Mon.kt
 index 90843e9..513f332 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/companion/data/Gen3Mon.kt
@@ -115,10 +141,10 @@ index b434241..b579f11 100644
          val out = ArrayList<Int>()
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomExtras.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomExtras.kt
 new file mode 100644
-index 0000000..36303f1
+index 0000000..a5bd9f3
 --- /dev/null
 +++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomExtras.kt
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,27 @@
 +package com.pokedaisy.app.companion.data
 +
 +/**
@@ -135,6 +161,8 @@ index 0000000..36303f1
 +    /** Field-function sets of builds whose gSpecials starts with HealPlayerParty: CENTER is offered as HEAL only on a match
 +     * ([PokemonCenter.healOnly]). */
 +    val healOnly: () -> List<FieldItemFns> = { emptyList() },
++    /** The game flies with any Pokémon that can learn Fly: FLY needs no one that knows it (the first non-egg Pokémon flies). */
++    val flyAnyMon: Boolean = false,
 +)
 +
 +/** The extras of [kind], or null. */

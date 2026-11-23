@@ -35,15 +35,28 @@ index 06e9f7f..f2fb435 100644
      }
  
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/RomFolder.kt b/app/src/main/kotlin/com/pokedaisy/app/RomFolder.kt
-index afa60b9..ac00e67 100644
+index afa60b9..1945a40 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/RomFolder.kt
 +++ b/app/src/main/kotlin/com/pokedaisy/app/RomFolder.kt
-@@ -267,7 +267,7 @@ object RomFolder {
+@@ -50,7 +50,12 @@ object RomFolder {
+         val listed get() = supported || partial || tryable || pokemon
+     }
+ 
++    /** The scan lists a ROM by its cart header alone (no hashing: the first run over a big folder was slow); whether the
++     * companion reads it is decided when the game starts. */
++    private const val FAST_SCAN = true
++
+     private fun entryOf(size: Long, modified: Long, f: File): Entry {
++        if (FAST_SCAN && CompanionSupport.ANY_GAME && runCatching { RomIdentity.looksLikeRom(f) }.getOrDefault(false)) return Entry(size, modified, true)
+         val e = verdictEntry(size, modified, f)
+         val blocked = runCatching { CompanionSupport.listed(f) }.getOrNull() != null
+         return if (blocked) Entry(size, modified, e.supported, blocked = true) else e
+@@ -267,7 +272,7 @@ object RomFolder {
       * linked before Black was supported stayed out of the library). */
      private val SUPPORTED = "#supported\t" + Integer.toHexString(
          // "pokemon": the cache from before unsupported Pokémon games were listed ([Entry.pokemon]) read again once.
 -        (listOf("pokemon") + TelemetrySampler.SUPPORTED_HACK_SHA1S.sorted() + TelemetrySampler.SUPPORTED_GB_SHA1S.sorted() +
-+        (listOf("pokemon", "any-game") + TelemetrySampler.SUPPORTED_HACK_SHA1S.sorted() + TelemetrySampler.SUPPORTED_GB_SHA1S.sorted() +
++        (listOf("pokemon", "any-game", "fast-scan") + TelemetrySampler.SUPPORTED_HACK_SHA1S.sorted() + TelemetrySampler.SUPPORTED_GB_SHA1S.sorted() +
              com.pokedaisy.app.companion.data.RETAIL_DUMPS.map { it.sha1 } +
              TelemetrySampler.NDS_GAMES.map { (code, rev) -> "$code:$rev" }.sorted() +
              com.pokedaisy.app.companion.data.OriginHeartGold.V4_0_3_EN_RC8_SHA1).hashCode(),

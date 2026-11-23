@@ -985,10 +985,10 @@ index 66ec92a..de09b52 100644
      //
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomSoulGold.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomSoulGold.kt
 new file mode 100644
-index 0000000..c0818c8
+index 0000000..ab4188d
 --- /dev/null
 +++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomSoulGold.kt
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,14 @@
 +package com.pokedaisy.app.companion.data
 +
 +/**
@@ -1000,6 +1000,7 @@ index 0000000..c0818c8
 +    GameKind.SOULGOLD,
 +    moveStats = moveStatsSoulGold,
 +    moveKinds = moveKindsSoulGold,
++    flyAnyMon = true,
 +    healOnly = { fieldItemsCandidatesForGame(GameKind.SOULGOLD, "BPEE", 0) },
 +)
 diff --git a/scripts/gen_soulgold_move_stats.py b/scripts/gen_soulgold_move_stats.py

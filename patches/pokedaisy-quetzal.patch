@@ -878,10 +878,10 @@ index 66ec92a..9284365 100644
      //
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomQuetzal.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomQuetzal.kt
 new file mode 100644
-index 0000000..c455795
+index 0000000..9191f5a
 --- /dev/null
 +++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomQuetzal.kt
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,15 @@
 +package com.pokedaisy.app.companion.data
 +
 +/**
@@ -894,6 +894,7 @@ index 0000000..c455795
 +    GameKind.QUETZAL,
 +    moveStats = moveStatsQuetzal,
 +    moveKinds = moveKindsQuetzal,
++    flyAnyMon = true,
 +    healOnly = { fieldItemsCandidatesForGame(GameKind.QUETZAL, "BPEE", 0) },
 +)
 diff --git a/scripts/gen_quetzal_move_stats.py b/scripts/gen_quetzal_move_stats.py

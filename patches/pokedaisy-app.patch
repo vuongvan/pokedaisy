@@ -74,38 +74,24 @@ index 597bb3c..34b596c 100644
      set(PKB_DIR "${CMAKE_CURRENT_BINARY_DIR}/pkbananads")
      set(PKB_LIB "${PKB_DIR}/libpkbananads.so")
 diff --git a/app/src/main/cpp/pk_api.h b/app/src/main/cpp/pk_api.h
-index 4d9a791..3367500 100644
+index 4d9a791..24bde75 100644
 --- a/app/src/main/cpp/pk_api.h
 +++ b/app/src/main/cpp/pk_api.h
-@@ -33,6 +33,11 @@ enum {
+@@ -33,6 +33,9 @@ enum {
  /** Starts the game at [romPath] (a .gba, .gb or .gbc), any game before it closed first. [savePath] (may be NULL) is
   * its battery save, created if missing and written as the game saves; a file it can't write still loads. */
  bool pk_api_init(const char* romPath, const char* savePath);
 +/** The GBA BIOS file the next pk_api_init boots through (a real console's start: the logo first), or NULL / "" for mGBA's built-in
 + * one (the game starts at once). Used by a Game Boy Advance game only. Kept until changed. */
 +void pk_api_set_bios(const char* path);
-+/** The speed settings (idle-loop detection, EXPAND's margin cache) for the next pk_api_init: 1 on, 0 off, -1 as the debug property says. */
-+void pk_api_set_perf(int on);
  /** Closes the game: its save written and closed, everything it held freed. Nothing up = nothing to do. */
  void pk_api_deinit(void);
  /** PK_API_PLATFORM_GBA / _GB, or _NONE with no game up. */
 diff --git a/app/src/main/cpp/pk_session.c b/app/src/main/cpp/pk_session.c
-index b84aa2a..ac5f66a 100644
+index b84aa2a..41f9fa6 100644
 --- a/app/src/main/cpp/pk_session.c
 +++ b/app/src/main/cpp/pk_session.c
-@@ -210,7 +210,11 @@ void pk_api_deinit(void) {
- 
- // The speed settings below (pk_perf.h, EXPAND's margin cache) on, unless `adb shell setprop debug.pokedaisy.perf 0` says
- // otherwise for the next game started: how they were timed against the app without them, one install for both.
-+static int pkPerfSetting = -1;
-+void pk_api_set_perf(int on) { pkPerfSetting = on; }
-+
- static bool pkPerfOn(void) {
-+    if (pkPerfSetting >= 0) return pkPerfSetting != 0;
- #ifdef __ANDROID__
-     char v[PROP_VALUE_MAX] = "";
-     if (__system_property_get("debug.pokedaisy.perf", v) > 0 && v[0] == '0') return false;
-@@ -223,6 +227,13 @@ struct mCore* pkMainCore(void) {
+@@ -223,6 +223,13 @@ struct mCore* pkMainCore(void) {
      return g.core;
  }
  
@@ -119,7 +105,7 @@ index b84aa2a..ac5f66a 100644
  bool pk_api_init(const char* romPath, const char* savePath) {
      if (g.core) {
          pk_api_deinit();
-@@ -296,6 +307,20 @@ bool pk_api_init(const char* romPath, const char* savePath) {
+@@ -296,6 +303,20 @@ bool pk_api_init(const char* romPath, const char* savePath) {
          }
      }
  
@@ -141,18 +127,13 @@ index b84aa2a..ac5f66a 100644
      bool perf = pkPerfOn();
      pk_idle_detect(core, perf);   // the game's wait for VBlank skipped, not run (pk_perf.h)
 diff --git a/app/src/main/cpp/pokedaisy_jni.c b/app/src/main/cpp/pokedaisy_jni.c
-index c41a6ef..7d30bd4 100644
+index c41a6ef..7dd0589 100644
 --- a/app/src/main/cpp/pokedaisy_jni.c
 +++ b/app/src/main/cpp/pokedaisy_jni.c
-@@ -129,6 +129,19 @@ Java_com_pokedaisy_app_MgbaCore_pkInit(JNIEnv* env, jobject thiz,
+@@ -129,6 +129,14 @@ Java_com_pokedaisy_app_MgbaCore_pkInit(JNIEnv* env, jobject thiz,
      return ok ? JNI_TRUE : JNI_FALSE;
  }
  
-+JNIEXPORT void JNICALL
-+Java_com_pokedaisy_app_MgbaCore_pkSetPerf(JNIEnv* env, jobject thiz, jboolean on) {
-+    pk_api_set_perf(on ? 1 : 0);
-+}
-+
 +/** The GBA BIOS file for the next pkInit (null = mGBA's built-in one). */
 +JNIEXPORT void JNICALL
 +Java_com_pokedaisy_app_MgbaCore_pkSetBios(JNIEnv* env, jobject thiz, jstring jPath) {
@@ -165,15 +146,14 @@ index c41a6ef..7d30bd4 100644
  Java_com_pokedaisy_app_MgbaCore_pkDeinit(JNIEnv* env, jobject thiz) {
      pkTeardown();
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/EmulatorEngine.kt b/app/src/main/kotlin/com/pokedaisy/app/EmulatorEngine.kt
-index d596ba9..4a671f4 100644
+index d596ba9..9f77170 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/EmulatorEngine.kt
 +++ b/app/src/main/kotlin/com/pokedaisy/app/EmulatorEngine.kt
-@@ -1042,6 +1042,9 @@ class EmulatorEngine(
+@@ -1042,6 +1042,8 @@ class EmulatorEngine(
          }
          ndsScaleSet = -1
          MgbaCore.pkNdsSetCore(ndsCore)
 +        // The player's GBA BIOS file, when GBA BIOS is on (Settings > FOLDERS): the game starts through it. A Game Boy or DS game ignores it.
-+        MgbaCore.pkSetPerf(preferences.speedTricks)
 +        MgbaCore.pkSetBios(preferences.gbaBiosPath?.takeIf { preferences.gbaBiosOn && java.io.File(it).isFile })
          if (!MgbaCore.pkInit(rom.absolutePath, save.absolutePath)) {
              loadError = "mGBA could not load ${rom.name}"
@@ -235,20 +215,80 @@ index 0000000..eb2b682
 +    }
 +}
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt b/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt
-index 6a0051e..200e1c4 100644
+index 6a0051e..9f278a3 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt
 +++ b/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt
-@@ -17,6 +17,10 @@ object MgbaCore {
+@@ -17,6 +17,8 @@ object MgbaCore {
  
      /** Loads [romPath], attaches [savePath] as persistent SRAM, resets. */
      external fun pkInit(romPath: String, savePath: String?): Boolean
 +    /** The GBA BIOS file the next [pkInit] of a GBA game boots through (null: mGBA's built-in one). */
 +    external fun pkSetBios(path: String?)
-+    /** The speed settings for the next [pkInit]: false runs the game without them (idle-loop skipping, EXPAND's margin cache). */
-+    external fun pkSetPerf(on: Boolean)
      external fun pkDeinit()
  
      /** Direct buffer over the native RGBA8888 framebuffer, [pkVideoWidth] x [pkVideoHeight]. */
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/PokeDaisyActivity.kt b/app/src/main/kotlin/com/pokedaisy/app/PokeDaisyActivity.kt
+index f329b88..04f07db 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/PokeDaisyActivity.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/PokeDaisyActivity.kt
+@@ -2356,6 +2356,26 @@ class PokeDaisyActivity : Activity() {
+             stored.setCheatsEnabled(on)
+             syncCheats()
+         }
++        override val cheatsEditable get() = gameCheats()?.editable == true
++        override fun addCheat(cheat: com.pokedaisy.app.cheats.Cheat) {
++            if (coopRefuses() || coopCheatsRefuse(cheat.enabled)) return
++            gameCheats()?.add(cheat)
++        }
++        override fun updateCheat(index: Int, cheat: com.pokedaisy.app.cheats.Cheat) {
++            if (coopRefuses() || coopCheatsRefuse(cheat.enabled)) return
++            gameCheats()?.replace(index, cheat)
++        }
++        override fun removeCheat(index: Int) {
++            if (coopRefuses()) return
++            gameCheats()?.remove(index)
++        }
++        override fun importCheats(onResult: (com.pokedaisy.app.cheats.CheatStore.Import?) -> Unit) {
++            cheatImportResult = onResult
++            startActivityForResult(android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
++                addCategory(android.content.Intent.CATEGORY_OPENABLE)
++                type = "*/*"
++            }, REQ_CHEAT_FILE)
++        }
+         override fun setCheatEnabled(index: Int, on: Boolean) {
+             if (coopRefuses()) return
+             if (coopCheatsRefuse(on)) return
+@@ -3206,6 +3226,22 @@ class PokeDaisyActivity : Activity() {
+     private fun cheatStore(): com.pokedaisy.app.cheats.CheatStore? =
+         romKey.takeIf { it.isNotEmpty() }?.let { com.pokedaisy.app.cheats.CheatStore.forCrc(filesDir.toOkioPath(), it) }
+ 
++    private var cheatImportResult: ((com.pokedaisy.app.cheats.CheatStore.Import?) -> Unit)? = null
++
++    /** A cheat file picked from the game's SETTINGS > CHEATS > IMPORT FILE: read off the UI thread, the answer given back on it. */
++    @Deprecated("Deprecated in Java")
++    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
++        super.onActivityResult(requestCode, resultCode, data)
++        if (requestCode != REQ_CHEAT_FILE) return
++        val done = cheatImportResult.also { cheatImportResult = null } ?: return
++        val uri = data?.data?.takeIf { resultCode == RESULT_OK } ?: return
++        Thread {
++            val name = uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.')?.ifBlank { null } ?: "CHEAT"
++            val result = runCatching { contentResolver.openInputStream(uri)?.source()?.use { gameCheats()?.import(it, name) } }.getOrNull()
++            runOnUiThread { done(result) }
++        }.start()
++    }
++
+     private fun gameCheats(): com.pokedaisy.app.companion.GameCheats? {
+         if (romKey.isEmpty() || !::engine.isInitialized) return null
+         return engine.playback.cheats ?: engine.playback.bindCheats(true, ::cheatStore,
+@@ -6277,6 +6313,7 @@ class PokeDaisyActivity : Activity() {
+     }
+ 
+     companion object {
++        private const val REQ_CHEAT_FILE = 7311
+         /** The GBA D-pad's key bits. */
+         private const val DPAD_KEYS = CoreKey.UP or CoreKey.DOWN or CoreKey.LEFT or CoreKey.RIGHT
+         /** [EmulatorEngine.battleMenuHidden] with the action menu (FIGHT / BAG / POKéMON / RUN) off the screen. */
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/PokeDaisyApp.kt b/app/src/main/kotlin/com/pokedaisy/app/PokeDaisyApp.kt
 index a1dd5e1..7ecd930 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/PokeDaisyApp.kt
@@ -263,18 +303,13 @@ index a1dd5e1..7ecd930 100644
      }
  }
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt b/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt
-index 771ad54..0fbc5fd 100644
+index 771ad54..f0e3614 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt
 +++ b/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt
-@@ -874,6 +874,21 @@ class Prefs(
+@@ -874,6 +874,16 @@ class Prefs(
          get() = p.getString("extra_save_dirs", null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty()
          set(v) = p.edit().putString("extra_save_dirs", v.distinct().joinToString("\n")).apply()
  
-+    /** Settings > FOLDERS > SPEED TRICKS: the core's speed settings; off when a game draws wrongly with them (Unbound's bike). */
-+    var speedTricks: Boolean
-+        get() = p.getBoolean("speed_tricks", true)
-+        set(v) = p.edit().putBoolean("speed_tricks", v).apply()
-+
 +    /** Settings > FOLDERS > GBA BIOS: the player's BIOS file ([GbaBios]); null = none picked. */
 +    var gbaBiosPath: String?
 +        get() = p.getString("gba_bios_path", null)
@@ -289,7 +324,7 @@ index 771ad54..0fbc5fd 100644
      var saveBackups: Boolean
          get() = p.getBoolean("save_backups", true)
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/SettingsActivity.kt b/app/src/main/kotlin/com/pokedaisy/app/SettingsActivity.kt
-index 580baa0..0df58ac 100644
+index 580baa0..291fe54 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/SettingsActivity.kt
 +++ b/app/src/main/kotlin/com/pokedaisy/app/SettingsActivity.kt
 @@ -1221,6 +1221,27 @@ class SettingsActivity : ComponentActivity() {
@@ -328,7 +363,7 @@ index 580baa0..0df58ac 100644
          return listOf(
              SettingRow(
                  tk("ROMS FOLDERS"), if (roms.isEmpty()) tk("NONE") else roms.size.toString(), opensPage = true,
-@@ -1961,7 +1983,24 @@ class SettingsActivity : ComponentActivity() {
+@@ -1961,7 +1983,20 @@ class SettingsActivity : ComponentActivity() {
                  labelBadge = com.pokedaisy.app.companion.NewFeatures.badge(com.pokedaisy.app.companion.NewFeatures.SAVE_BACKUPS),
              ) { screen = Screen.BACKUPS },
              SettingRow(tk("SAVE STATES"), humanSize(states), opensPage = true) { screen = Screen.STATES_FOLDER },
@@ -346,19 +381,40 @@ index 580baa0..0df58ac 100644
 +                prefs.gbaBiosOn = false
 +                folderTick++
 +            } else null,
-+            SettingRow(
-+                tk("SPEED TRICKS"), if (prefs.speedTricks) tk("ON") else tk("OFF"),
-+                subtitle = "Off if a game draws wrongly (Unbound's bike): a little slower, exact. Applies to the next game you start",
-+            ) { prefs.speedTricks = !prefs.speedTricks; folderTick++ },
 +        ).filterNotNull()
      }
  
      private val statesDir by lazy { File(getExternalFilesDir(null), "states").apply { mkdirs() } }
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/CompanionSettings.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/CompanionSettings.kt
+index 612538b..d6a4603 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/CompanionSettings.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/CompanionSettings.kt
+@@ -472,6 +472,8 @@ interface CompanionSettings : StoredCompanionSettings {
+     val cheatsEditable: Boolean get() = false
+     fun addCheat(cheat: com.pokedaisy.app.cheats.Cheat) {}
+     fun removeCheat(index: Int) {}
++    /** Replaces the game's cheat [index] (in [cheats]) with [cheat]. */
++    fun updateCheat(index: Int, cheat: com.pokedaisy.app.cheats.Cheat) {}
+     fun importCheats(onResult: (com.pokedaisy.app.cheats.CheatStore.Import?) -> Unit) {}
+ 
+     /** Display name of the currently-detected game (e.g. "Pokémon Heart and
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/GameCheats.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/GameCheats.kt
+index af48a00..2442b8e 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/GameCheats.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/GameCheats.kt
+@@ -52,6 +52,7 @@ class GameCheats(
+         if (index in before.indices) save(before.mapIndexed { i, c -> if (i == index) c.copy(enabled = on) else c })
+     }
+     fun add(cheat: Cheat) = save(list + cheat)
++    fun replace(index: Int, cheat: Cheat) { if (index in list.indices) save(list.mapIndexed { i, c -> if (i == index) cheat else c }) }
+     fun remove(index: Int) { if (index in list.indices) save(list.filterIndexed { i, _ -> i != index }) }
+ 
+     fun import(path: String): CheatStore.Import? = runCatching {
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt
-index e14a553..8d0f0d4 100644
+index e14a553..5732d06 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt
 +++ b/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt
-@@ -757,4 +757,9 @@ internal val trSettings: Map<String, Tr> = mapOf(
+@@ -757,4 +757,10 @@ internal val trSettings: Map<String, Tr> = mapOf(
      "The group buttons beside this list" to Tr(ja = "この リストの よこの グループ ボタン", fr = "Les boutons de groupe à côté de la liste", de = "Die Gruppenknöpfe neben dieser Liste", it = "I pulsanti dei gruppi accanto alla lista", es = "Los botones de grupo junto a esta lista", br = "Os botões de grupo ao lado desta lista", pt = "Os botões de grupo ao lado desta lista", ko = "이 목록 옆의 그룹 버튼"),
      "LEVEL CAP" to Tr(ja = "レベルじょうげん", fr = "NIVEAU MAX", de = "LEVEL-GRENZE", it = "LIVELLO MAX", es = "NIVEL MÁXIMO", br = "NÍVEL MÁXIMO", pt = "NÍVEL MÁXIMO", ko = "레벨 제한"),
      "Stops at the next boss's top level" to Tr(ja = "つぎの ボスの いちばん たかい レベルで とまる", fr = "S'arrête au niveau max du prochain boss", de = "Stoppt beim höchsten Level des nächsten Bosses", it = "Si ferma al livello più alto del prossimo boss", es = "Se detiene en el nivel más alto del próximo jefe", br = "Para no nível mais alto do próximo chefe", pt = "Para no nível mais alto do próximo chefe", ko = "다음 보스의 최고 레벨에서 멈춰요"),
@@ -366,8 +422,149 @@ index e14a553..8d0f0d4 100644
 +    "REMOVE BIOS" to Tr(ja = "BIOSを けす", fr = "RETIRER LE BIOS", de = "BIOS ENTFERNEN", it = "RIMUOVI BIOS", es = "QUITAR BIOS", br = "REMOVER BIOS", pt = "REMOVER BIOS", ko = "BIOS 삭제"),
 +    "GBA BIOS added and on. New GBA games start with the logo." to Tr(ja = "GBA BIOSを ついかして オンに しました。 あたらしい GBAゲームは ロゴから はじまります。", fr = "BIOS GBA ajouté et activé. Les nouveaux jeux GBA démarrent avec le logo.", de = "GBA-BIOS hinzugefügt und aktiviert. Neue GBA-Spiele starten mit dem Logo.", it = "BIOS GBA aggiunto e attivato. I nuovi giochi GBA partono con il logo.", es = "BIOS de GBA añadido y activado. Los juegos de GBA nuevos empiezan con el logo.", br = "BIOS do GBA adicionada e ativada. Novos jogos de GBA começam com o logo.", pt = "BIOS do GBA adicionada e ativada. Os novos jogos GBA começam com o logo.", ko = "GBA BIOS를 추가하고 켰습니다. 새 GBA 게임은 로고와 함께 시작됩니다."),
 +    "GBA BIOS added and on. It isn't the usual retail file, but it looks like a GBA BIOS." to Tr(ja = "GBA BIOSを ついかして オンに しました。 ふつうの せいひんばんの ファイルでは ありませんが、 GBA BIOSに みえます。", fr = "BIOS GBA ajouté et activé. Ce n'est pas le fichier commercial habituel, mais il ressemble à un BIOS GBA.", de = "GBA-BIOS hinzugefügt und aktiviert. Es ist nicht die übliche Handelsversion, sieht aber wie ein GBA-BIOS aus.", it = "BIOS GBA aggiunto e attivato. Non è il solito file commerciale, ma sembra un BIOS GBA.", es = "BIOS de GBA añadido y activado. No es el archivo comercial habitual, pero parece un BIOS de GBA.", br = "BIOS do GBA adicionada e ativada. Não é o arquivo comercial usual, mas parece uma BIOS de GBA.", pt = "BIOS do GBA adicionada e ativada. Não é o ficheiro comercial habitual, mas parece uma BIOS de GBA.", ko = "GBA BIOS를 추가하고 켰습니다. 일반 정식 파일은 아니지만 GBA BIOS처럼 보입니다."),
-+    "SPEED TRICKS" to Tr(ja = "こうそくか", fr = "ASTUCES DE VITESSE", de = "TEMPO-TRICKS", it = "TRUCCHI DI VELOCITÀ", es = "TRUCOS DE VELOCIDAD", br = "TRUQUES DE VELOCIDADE", pt = "TRUQUES DE VELOCIDADE", ko = "속도 최적화"),
++    "EDIT" to Tr(ja = "へんしゅう", fr = "MODIFIER", de = "BEARBEITEN", it = "MODIFICA", es = "EDITAR", br = "EDITAR", pt = "EDITAR", ko = "편집"),
++    "EDIT CHEAT" to Tr(ja = "チートを へんしゅう", fr = "MODIFIER LE CHEAT", de = "CHEAT BEARBEITEN", it = "MODIFICA CHEAT", es = "EDITAR TRUCO", br = "EDITAR CHEAT", pt = "EDITAR CHEAT", ko = "치트 편집"),
  )
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/CheatAddForm.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/CheatAddForm.kt
+index c705e4b..bd077ac 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/CheatAddForm.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/CheatAddForm.kt
+@@ -16,10 +16,11 @@ import com.pokedaisy.app.companion.i18n.tr
+ /** The existing Android code-entry form, shared with hosts that can type codes beside the game. */
+ @Composable
+ fun CheatAddForm(m: GbaTextMetrics, small: GbaTextMetrics, ds: Boolean, nextNumber: Int,
+-                 onCancel: () -> Unit, onAdd: (Cheat) -> Unit, modifier: Modifier = Modifier) {
++                 onCancel: () -> Unit, onAdd: (Cheat) -> Unit, modifier: Modifier = Modifier,
++                 initial: Cheat? = null, saveLabel: String = tk("ADD")) {
+     var typesOpen by remember { mutableStateOf(false) }
+-    var name by remember { mutableStateOf("") }
+-    var code by remember { mutableStateOf("") }
++    var name by remember { mutableStateOf(initial?.name ?: "") }
++    var code by remember { mutableStateOf(initial?.lines?.joinToString("\n") ?: "") }
+     var type by remember { mutableStateOf(CheatType.AUTO) }
+     var error by remember { mutableStateOf<String?>(null) }
+     Box(modifier) {
+@@ -46,7 +47,7 @@ fun CheatAddForm(m: GbaTextMetrics, small: GbaTextMetrics, ds: Boolean, nextNumb
+                     }
+                     Row(Modifier.padding(vertical = m.u * 4), horizontalArrangement = Arrangement.spacedBy(m.u * 4)) {
+                         OptionButton(tk("CANCEL"), m, onClick = onCancel)
+-                        OptionButton(tk("ADD"), m, emphasis = true, enabled = code.isNotBlank(), onClick = {
++                        OptionButton(saveLabel, m, emphasis = true, enabled = code.isNotBlank(), onClick = {
+                             val lines = CheatCodes.normalize(code)
+                             val label = name.trim().ifEmpty { tr("CHEAT {0}", nextNumber) }
+                             val r = CheatCheck.check(Cheat(label, lines), type, ds = ds)
+@@ -59,8 +60,8 @@ fun CheatAddForm(m: GbaTextMetrics, small: GbaTextMetrics, ds: Boolean, nextNumb
+                                     else -> tr("mGBA can't read {0} as a {1} code.", r.bad.joinToString(", "), tr(type.label))
+                                 }
+                             } else {
+-                                // Typed in to be used: on (the master switch still decides).
+-                                onAdd(ok.copy(enabled = true))
++                                // Typed in to be used: on (the master switch still decides); an edited cheat keeps its switch.
++                                onAdd(ok.copy(enabled = initial?.enabled ?: true))
+                             }
+                         })
+                     }
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/CompanionSettingsScreen.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/CompanionSettingsScreen.kt
+index b0327d3..22da7e9 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/CompanionSettingsScreen.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/CompanionSettingsScreen.kt
+@@ -61,12 +61,12 @@ val STATUS_BAR_PLACES = listOf(tk("OFF"), tk("GAME"), tk("COMPANION"))
+ 
+ fun statusBarLabel(on: Boolean, onCompanion: Boolean) = STATUS_BAR_PLACES[if (!on) 0 else if (onCompanion) 2 else 1]
+ 
+-internal enum class Page(val title: String) { HOME(tk("SETTINGS")), TABS(tk("TAB BAR")), BUTTONS(tk("GAME BUTTONS")), HOTKEYS(tk("HOTKEYS")), SHADERS(tk("SHADERS")), FIELD_HUD(tk("HUD")), QUICK_MENU(tk("QUICK MENU")), TOUCH(tk("TOUCH CONTROLS")), SPEED(tk("SPEED OPTIONS")), DISPLAY(tk("DISPLAY OPTIONS")), CHEATS(tk("CHEATS")), CHEAT_ADD(tk("ADD CODE")), TWEAKS(tk("TWEAKS")), COOP_PARTNERS(tk("PARTNERS")), HELP(tk("HELP")) }
++internal enum class Page(val title: String) { HOME(tk("SETTINGS")), TABS(tk("TAB BAR")), BUTTONS(tk("GAME BUTTONS")), HOTKEYS(tk("HOTKEYS")), SHADERS(tk("SHADERS")), FIELD_HUD(tk("HUD")), QUICK_MENU(tk("QUICK MENU")), TOUCH(tk("TOUCH CONTROLS")), SPEED(tk("SPEED OPTIONS")), DISPLAY(tk("DISPLAY OPTIONS")), CHEATS(tk("CHEATS")), CHEAT_ADD(tk("ADD CODE")), CHEAT_EDIT(tk("EDIT CHEAT")), TWEAKS(tk("TWEAKS")), COOP_PARTNERS(tk("PARTNERS")), HELP(tk("HELP")) }
+ 
+ /** Where BACK from a page goes: SHADERS opens from DISPLAY OPTIONS, the rest from HOME. */
+ internal val Page.parent: Page get() = when (this) {
+     Page.SHADERS -> Page.DISPLAY
+-    Page.CHEAT_ADD -> Page.CHEATS
++    Page.CHEAT_ADD, Page.CHEAT_EDIT -> Page.CHEATS
+     else -> Page.HOME
+ }
+ 
+@@ -125,6 +125,8 @@ fun CompanionSettingsScreen(
+     var confirm by remember { mutableStateOf<Confirm?>(null) }
+     var cheatNotice by remember { mutableStateOf<Pair<String, String>?>(null) }
+     var removingCheats by remember(page) { mutableStateOf(false) }
++    var editingCheats by remember(page) { mutableStateOf(false) }
++    var editIndex by remember { mutableStateOf(-1) }
+     var selector by remember { mutableStateOf<Selector?>(null) }
+     // TOUCH CONTROLS > SKINS: the imported skins (read on the way in) and their pick-list.
+     val touchSkinUi = remember { TouchSkinUi() }
+@@ -169,7 +171,7 @@ fun CompanionSettingsScreen(
+             }
+             // EDIT LAYOUT saves over the game, outside this page: its revision redraws TOUCH CONTROLS.
+             val touchRevision = settings?.touchRevision ?: 0
+-            val rows = remember(settings, page, tick, availableTabs, playsAs, capturing, capturedKeys, touchRevision, removingCheats) {
++            val rows = remember(settings, page, tick, availableTabs, playsAs, capturing, capturedKeys, touchRevision, removingCheats, editingCheats) {
+                 if (settings == null) return@remember listOf(SettingRow(tk("NO GAME RUNNING"), null) {})
+                 when (page) {
+                     Page.HOME -> playsAs?.let { game ->
+@@ -281,10 +283,12 @@ fun CompanionSettingsScreen(
+                     ) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
+                     Page.SPEED -> speedRows(settings, { tick++ }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
+                     Page.DISPLAY -> displayRows(settings, { tick++ }, { page = it }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
+-                    Page.CHEATS -> cheatRows(settings, changed = { tick++ }, removing = removingCheats,
++                    Page.CHEATS -> cheatRows(settings, changed = { tick++ }, removing = removingCheats, editing = editingCheats,
+                         onAdd = { page = Page.CHEAT_ADD },
++                        onEditMode = { editingCheats = !editingCheats; removingCheats = false },
++                        onEdit = { index -> editIndex = index; page = Page.CHEAT_EDIT },
+                         onImport = { settings.importCheats { result -> cheatNotice = cheatImportNotice(result); tick++ } },
+-                        onRemoveMode = { removingCheats = !removingCheats },
++                        onRemoveMode = { removingCheats = !removingCheats; editingCheats = false },
+                         onRemove = { index ->
+                             settings.cheats.getOrNull(index)?.let { cheat ->
+                                 confirm = Confirm(tk("REMOVE CHEAT?"), cheat.name, tk("REMOVE")) {
+@@ -292,7 +296,7 @@ fun CompanionSettingsScreen(
+                                 }
+                             }
+                         }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
+-                    Page.CHEAT_ADD -> emptyList()
++                    Page.CHEAT_ADD, Page.CHEAT_EDIT -> emptyList()
+                     // Small preferences, each on by default (CompanionTweaks).
+                     Page.TWEAKS -> CompanionTweaks.Tweak.entries.map { t ->
+                         // LIGHT COMPANION keeps the animations off whatever these say (CompanionTweaks.get).
+@@ -324,6 +328,13 @@ fun CompanionSettingsScreen(
+                     CheatAddForm(m, rememberGbaTextMetrics(textScale = 1f), ds = false, nextNumber = settings.cheats.size + 1,
+                         onCancel = { page = Page.CHEATS }, onAdd = { settings.addCheat(it); tick++; page = Page.CHEATS },
+                         modifier = Modifier.fillMaxWidth().weight(1f))
++                } else if (page == Page.CHEAT_EDIT && settings != null) {
++                    val target = settings.cheats.getOrNull(editIndex)
++                    if (target == null) page = Page.CHEATS
++                    else CheatAddForm(m, rememberGbaTextMetrics(textScale = 1f), ds = false, nextNumber = editIndex + 1,
++                        initial = target, saveLabel = tk("SAVE"),
++                        onCancel = { page = Page.CHEATS }, onAdd = { settings.updateCheat(editIndex, it); tick++; page = Page.CHEATS },
++                        modifier = Modifier.fillMaxWidth().weight(1f))
+                 } else if (application && page == Page.HOME) {
+                     AppSettingsHome(rows, m, appSearch, { appSearch = it },
+                         Modifier.fillMaxWidth().weight(1f), scroll = homeScroll, footer = applicationFooter)
+@@ -1178,9 +1189,9 @@ private fun cheatsValue(s: CompanionSettings): String =
+  * CHEATS: the master switch, then one row per cheat of this game, each flipping
+  * live. Hosts with a keyboard can use the same entry form and import result UI as the top-screen settings.
+  */
+-private fun cheatRows(s: CompanionSettings, changed: () -> Unit, removing: Boolean,
+-                      onAdd: () -> Unit, onImport: () -> Unit, onRemoveMode: () -> Unit,
+-                      onRemove: (Int) -> Unit): List<SettingRow> {
++private fun cheatRows(s: CompanionSettings, changed: () -> Unit, removing: Boolean, editing: Boolean,
++                      onAdd: () -> Unit, onImport: () -> Unit, onEditMode: () -> Unit, onEdit: (Int) -> Unit,
++                      onRemoveMode: () -> Unit, onRemove: (Int) -> Unit): List<SettingRow> {
+     fun onOff(on: Boolean) = if (on) tk("ON") else tk("OFF")
+     val master = s.cheatsEnabled
+     val cheats = s.cheats
+@@ -1193,10 +1204,12 @@ private fun cheatRows(s: CompanionSettings, changed: () -> Unit, removing: Boole
+             )
+         } else cheats.mapIndexed { i, c ->
+             if (removing) SettingRow(c.name, tk("REMOVE")) { onRemove(i) }
++            else if (editing) SettingRow(c.name, tk("EDIT")) { onEdit(i) }
+             else SettingRow(c.name, onOff(c.enabled), enabled = master) { s.setCheatEnabled(i, !c.enabled); changed() }
+         }) + if (s.cheatsEditable) listOfNotNull(
+             SettingRow(tk("ADD CODE"), null, labelBadge = s.cheatsBadge, opensPage = true, onClick = onAdd),
+             SettingRow(tk("IMPORT FILE"), null, onClick = onImport),
++            if (cheats.isNotEmpty()) SettingRow(tk(if (editing) "DONE" else "EDIT"), null, onClick = onEditMode) else null,
+             if (cheats.isNotEmpty()) SettingRow(tk(if (removing) "DONE" else "REMOVE"), null, onClick = onRemoveMode) else null,
+         ) else emptyList()
+ }
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/GameScreenState.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/GameScreenState.kt
 index 0a1c05b..71a1fe3 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/GameScreenState.kt
@@ -436,14 +633,13 @@ index 3d2e61e..e5f104c 100644
 + */
 +const val PORTRAIT_GRIP_HIDDEN = true
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/SettingRows.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/SettingRows.kt
-index 7372d56..2f189cd 100644
+index 7372d56..4aa4935 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/SettingRows.kt
 +++ b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/SettingRows.kt
-@@ -127,6 +127,8 @@ val SETTING_KEYWORDS: Map<String, String> = mapOf(
+@@ -127,6 +127,7 @@ val SETTING_KEYWORDS: Map<String, String> = mapOf(
      "LOOK" to "style appearance glass solid outline console window touch controls buttons hud",
      "COLORS" to "touch controls buttons colours color theme dark light indigo glacier spice kiwi fuchsia retro primary",
      "GBA SKIN" to "touch controls skin skins deltaskin delta controller picture",
-+    "SPEED TRICKS" to "speed performance idle glitch graphics wrong sprite bike unbound exact accuracy",
 +    "GBA BIOS" to "bios boot logo startup intro nintendo gba_bios.bin real console start screen",
      "IMPORT SKIN" to "touch controls skin skins deltaskin delta add install controller picture",
      "GAME BUTTONS" to "key bindings keybinds keybinding controls remap remapping rebind mapping input controller gamepad buttons turbo start 2 select 2 x y ds nds game boy gba to companion d-pad dpad directions up down left right arrows 8bitdo micro keyboard mode",

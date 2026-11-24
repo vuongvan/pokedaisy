@@ -410,6 +410,23 @@ index af48a00..2442b8e 100644
      fun remove(index: Int) { if (index in list.indices) save(list.filterIndexed { i, _ -> i != index }) }
  
      fun import(path: String): CheatStore.Import? = runCatching {
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/ShinyOdds.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/ShinyOdds.kt
+index f44056f..45e061e 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/data/ShinyOdds.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/ShinyOdds.kt
+@@ -25,9 +25,9 @@ import kotlin.random.Random
+ object ShinyOdds {
+     /** The game's own odds: 8 shiny values in 65536. */
+     const val NORMAL = 8192
+-    val CHOICES = listOf(NORMAL, 4096, 1024, 512, 128)
+-    /** Debug builds: almost every one, and every one, to check it quickly. */
+-    val DEBUG_CHOICES = CHOICES + listOf(4, 1)
++    /** 1 in 4 and 1 in 1 (every one) are picks too. */
++    val CHOICES = listOf(NORMAL, 4096, 1024, 512, 128, 4, 1)
++    val DEBUG_CHOICES = CHOICES
+     fun choices(debug: Boolean) = if (debug) DEBUG_CHOICES else CHOICES
+ 
+     /**
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt
 index e14a553..5732d06 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt
@@ -465,7 +482,7 @@ index c705e4b..bd077ac 100644
                          })
                      }
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/CompanionSettingsScreen.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/CompanionSettingsScreen.kt
-index b0327d3..22da7e9 100644
+index b0327d3..deba81b 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/CompanionSettingsScreen.kt
 +++ b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/CompanionSettingsScreen.kt
 @@ -61,12 +61,12 @@ val STATUS_BAR_PLACES = listOf(tk("OFF"), tk("GAME"), tk("COMPANION"))
@@ -501,7 +518,15 @@ index b0327d3..22da7e9 100644
                  if (settings == null) return@remember listOf(SettingRow(tk("NO GAME RUNNING"), null) {})
                  when (page) {
                      Page.HOME -> playsAs?.let { game ->
-@@ -281,10 +283,12 @@ fun CompanionSettingsScreen(
+@@ -177,6 +179,7 @@ fun CompanionSettingsScreen(
+                             opensPage = true, labelBadge = settings.gamePickBadge) { onPlaysAs() })
+                     }.orEmpty() + homeRows(settings, barCount(settings, availableTabs), { tick++ }, { page = it }, { selector = it },
+                         { c -> confirm = Confirm(c.title, c.message, c.confirmLabel, c.onConfirm).also { it.cancelLabel = c.cancelLabel; it.onCancel = c.onCancel } })
++                        .let { withoutGreyedGameplay(it) }
+                         .let { if (settings.gameBlocked) withoutGameRows(it) else it }
+                         .let { rows -> settings.shownRows?.let { onlyRows(rows, it) } ?: rows } + homeExtras
+                     Page.TABS -> COMPANION_TABS.map { id ->
+@@ -281,10 +284,12 @@ fun CompanionSettingsScreen(
                      ) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                      Page.SPEED -> speedRows(settings, { tick++ }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                      Page.DISPLAY -> displayRows(settings, { tick++ }, { page = it }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
@@ -516,7 +541,7 @@ index b0327d3..22da7e9 100644
                          onRemove = { index ->
                              settings.cheats.getOrNull(index)?.let { cheat ->
                                  confirm = Confirm(tk("REMOVE CHEAT?"), cheat.name, tk("REMOVE")) {
-@@ -292,7 +296,7 @@ fun CompanionSettingsScreen(
+@@ -292,7 +297,7 @@ fun CompanionSettingsScreen(
                                  }
                              }
                          }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
@@ -525,7 +550,7 @@ index b0327d3..22da7e9 100644
                      // Small preferences, each on by default (CompanionTweaks).
                      Page.TWEAKS -> CompanionTweaks.Tweak.entries.map { t ->
                          // LIGHT COMPANION keeps the animations off whatever these say (CompanionTweaks.get).
-@@ -324,6 +328,13 @@ fun CompanionSettingsScreen(
+@@ -324,6 +329,13 @@ fun CompanionSettingsScreen(
                      CheatAddForm(m, rememberGbaTextMetrics(textScale = 1f), ds = false, nextNumber = settings.cheats.size + 1,
                          onCancel = { page = Page.CHEATS }, onAdd = { settings.addCheat(it); tick++; page = Page.CHEATS },
                          modifier = Modifier.fillMaxWidth().weight(1f))
@@ -539,7 +564,32 @@ index b0327d3..22da7e9 100644
                  } else if (application && page == Page.HOME) {
                      AppSettingsHome(rows, m, appSearch, { appSearch = it },
                          Modifier.fillMaxWidth().weight(1f), scroll = homeScroll, footer = applicationFooter)
-@@ -1178,9 +1189,9 @@ private fun cheatsValue(s: CompanionSettings): String =
+@@ -407,7 +419,7 @@ fun CompanionSettingsScreen(
+                             labelWeight = if (page == Page.CHEATS) 0.75f else 0.58f,
+                             valueBadge = { rows[it].badge },
+                             enabled = { rows[it].enabled },
+-                            labelBadge = { rows[it].labelBadge },
++                            labelBadge = { null },
+                             onFocused = ::moveCursor,
+                         )
+                     }
+@@ -536,6 +548,15 @@ private fun withoutGameRows(rows: List<SettingRow>): List<SettingRow> {
+     }
+ }
+ 
++/** GAMEPLAY's greyed rows (what this game can't do: N/A, or has its own) aren't listed, nor a group left with none. */
++private fun withoutGreyedGameplay(rows: List<SettingRow>): List<SettingRow> {
++    var inGameplay = false
++    val kept = rows.filter { r ->
++        if (r.header) { inGameplay = r.label == tk("GAMEPLAY"); true } else !(inGameplay && !r.enabled)
++    }
++    return kept.filterIndexed { i, r -> !r.header || kept.getOrNull(i + 1)?.header == false }
++}
++
+ /** [rows] cut to the ones labelled in [shown], with the titles of the groups that still have one. */
+ private fun onlyRows(rows: List<SettingRow>, shown: Set<String>): List<SettingRow> {
+     val kept = rows.filter { it.header || it.label in shown }
+@@ -1178,9 +1199,9 @@ private fun cheatsValue(s: CompanionSettings): String =
   * CHEATS: the master switch, then one row per cheat of this game, each flipping
   * live. Hosts with a keyboard can use the same entry form and import result UI as the top-screen settings.
   */
@@ -552,7 +602,7 @@ index b0327d3..22da7e9 100644
      fun onOff(on: Boolean) = if (on) tk("ON") else tk("OFF")
      val master = s.cheatsEnabled
      val cheats = s.cheats
-@@ -1193,10 +1204,12 @@ private fun cheatRows(s: CompanionSettings, changed: () -> Unit, removing: Boole
+@@ -1193,10 +1214,12 @@ private fun cheatRows(s: CompanionSettings, changed: () -> Unit, removing: Boole
              )
          } else cheats.mapIndexed { i, c ->
              if (removing) SettingRow(c.name, tk("REMOVE")) { onRemove(i) }

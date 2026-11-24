@@ -3,7 +3,7 @@ package com.pokedaisy.app.companion.data.save
 import com.pokedaisy.app.companion.data.Gfx
 import com.pokedaisy.app.companion.data.LockedMap
 import com.pokedaisy.app.companion.data.NATIVE_EMERALD_RETAIL
-import com.pokedaisy.app.companion.data.NATIVE_FIRERED_REV0
+import com.pokedaisy.app.companion.data.NATIVE_FIRERED_REV0_RETAIL
 import com.pokedaisy.app.companion.data.NATIVE_FIRERED_REV1
 import com.pokedaisy.app.companion.data.PokedexTables
 import com.pokedaisy.app.companion.data.RomArt
@@ -47,7 +47,7 @@ class RomMonSprites private constructor(private val rom: Path, private val table
 
         /** The dex tables for a ROM with this whole-file [sha1], header [code] and [revision]; null = not one we know. */
         fun tablesFor(sha1: String?, code: String?, revision: Int?): PokedexTables? = when (sha1) {
-            FIRERED_REV0_SHA1 -> NATIVE_FIRERED_REV0.pokedex
+            FIRERED_REV0_SHA1 -> NATIVE_FIRERED_REV0_RETAIL.pokedex
             FIRERED_REV1_SHA1 -> NATIVE_FIRERED_REV1.pokedex
             EMERALD_SHA1 -> NATIVE_EMERALD_RETAIL.pokedex
             else -> if (code != null && revision != null && code in TelemetrySampler.OTHER_RETAIL_CODES) {

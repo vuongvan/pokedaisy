@@ -1519,6 +1519,24 @@ val POKEDEX_FIRERED_REV1: PokedexTables by lazy {
     )
 }
 
+// FireRed 1.0 (retail rev 0): rev 1's tables, found in the rev 0 cart. Everything up to the footprints sits 0x70
+// lower than in rev 1, the dex entries and the TM / HM move list 0x60 lower (BULBASAUR's entry: SEED, 0.7 m, 6.9 kg;
+// FOCUS PUNCH, DRAGON CLAW, WATER PULSE first).
+val POKEDEX_FIRERED_REV0: PokedexTables by lazy {
+    PokedexTables(
+        entries = 0x0844E850L,
+        frontPics = 0x082350ACL,
+        palettes = 0x0823730CL,
+        speciesInfo = 0x08254784L,
+        speciesToNational = 0x08251FEEL,
+        abilityNames = 0x0824FC40L,
+        footprints = 0x0843FAB0L,
+        evolutions = 0x08259754L,
+        tmhmLearnsets = 0x08252BC8L,
+        tmhmMoves = 0x0845A5A4L,
+    )
+}
+
 // LeafGreen: FireRed's layout, its own tables (and dex text).
 val POKEDEX_LEAFGREEN_REV0: PokedexTables by lazy {
     PokedexTables(
@@ -1556,6 +1574,16 @@ val GUIDE_TABLES_FIRERED_REV1: GuideTables by lazy {
         learnsets = 0x0825D824L,
         wildHeaders = 0x083C9D28L,
         mapGroups = 0x08352718L,
+    )
+}
+
+// FireRed 1.0: rev 1's, each 0x70 lower (BROCK is trainer 414 there too).
+val GUIDE_TABLES_FIRERED_REV0: GuideTables by lazy {
+    GuideTables(
+        trainers = 0x0823EAC8L,
+        learnsets = 0x0825D7B4L,
+        wildHeaders = 0x083C9CB8L,
+        mapGroups = 0x083526A8L,
     )
 }
 

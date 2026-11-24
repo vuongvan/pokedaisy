@@ -69,7 +69,11 @@ class GameScreenView(
         message.layoutParams = android.view.ViewGroup.LayoutParams(-2, -2)
         contentView.setContent {
             val effect = CompanionColors.composeEffect(this)
+            // The panel tabs' and grips' layers are clipped: an unclipped shader effect samples past its layer with
+            // clamp, which smeared the side panel's edge tab across the game screen as a row and a column (DS games
+            // on two screens). The HUD's layer stays unclipped (RAILS draw beside the picture).
             val chrome = Modifier.graphicsLayer { renderEffect = effect }
+            val chromeTabs = Modifier.graphicsLayer { renderEffect = effect; clip = effect != null }
             androidx.compose.runtime.CompositionLocalProvider(com.pokedaisy.app.companion.ui.LocalClickSound provides click) {
                 androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                     GameScreen(panels, viewport::gameHeightFor,
@@ -77,7 +81,7 @@ class GameScreenView(
                         companion = { if (panels.portrait.enabled) portraitContent?.invoke() else sideContent?.invoke() },
                         gameUnderlay = underlay,
                         gameOverlay = { androidx.compose.foundation.layout.Box(chrome, propagateMinConstraints = true) { gameOverlay() } },
-                        pictureOverlay = pictureOverlay, chromeModifier = chrome,
+                        pictureOverlay = pictureOverlay, chromeModifier = chromeTabs,
                         dismissSideOnGameTap = { controls.visibility != View.VISIBLE },
                         overlayRect = { viewport.overlayBounds().let { Rect(it.left.toFloat(), it.top.toFloat(), it.right.toFloat(), it.bottom.toFloat()) } },
                         screenOverlayTop = { viewport.hudTop },

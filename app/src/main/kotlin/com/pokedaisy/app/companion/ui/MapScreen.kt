@@ -279,8 +279,10 @@ fun MapScreen(
                 FlyList(
                     model, t, flyer = snapshot.party.getOrNull(t.flyerSlot)?.name,
                     onPick = { mapsec ->
+                        // The list goes with the pick: a DS flight's answer can come only after its fade (or never, a
+                        // job dropped on the way), and the list stayed over the map meanwhile. A refusal still shows.
+                        flyTargets = null
                         fly?.fly(mapsec, t) { result ->
-                            flyTargets = null
                             if (result == com.pokedaisy.app.companion.data.FlyResult.OK) flewFrom = snapshot.regionMapSectionId
                             if (result != com.pokedaisy.app.companion.data.FlyResult.OK) flyNote = flyMessage(result)
                         }

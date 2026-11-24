@@ -359,7 +359,7 @@ static void build_where(const struct pd_game* g, const struct pd_snapshot* s) {
 }
 
 void pd_ui_guide_boss_note(char* note, size_t size, const char* place, int count, int ace, int best) {
-    snprintf(note, size, pd_tr("%.40s - %d POKéMON - UP TO LV%d - YOUR BEST LV%d"), place, count, ace, best);
+    snprintf(note, size, pd_tr("%.40s · %d POKéMON · UP TO LV%d · YOUR BEST LV%d"), place, count, ace, best);
 }
 
 // A boss team's members, one entry each: level, then types as the hint, then species, moves and item as the answer.
@@ -424,7 +424,7 @@ static void build_world_bosses(const struct pd_game* g, const struct pd_snapshot
             int top = 0;
             for (int i = 1; i < n; i++) top = team[i].level > team[top].level ? i : top;
             // The heading is long enough as it is: what tells the teams apart goes first under it.
-            if (teams > 1) snprintf(where, sizeof(where), pd_tr("WITH %s - %s"), pd_species_name(g, team[top].species, name, sizeof(name)), boss->where);
+            if (teams > 1) snprintf(where, sizeof(where), pd_tr("WITH %s · %s"), pd_species_name(g, team[top].species, name, sizeof(name)), boss->where);
             else snprintf(where, sizeof(where), "%s", boss->where);
             team_section(g, boss->title, where, !shown, best, team, n);
             shown++;

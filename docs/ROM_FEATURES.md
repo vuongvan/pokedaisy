@@ -64,7 +64,7 @@ change to any of the places listed under "Where it's decided" updates its rows h
 | Black 2 (DS) | France, Germany, Spain, Italy, Korea; Japan rev 1 ³¹ | ✅ ¹⁴ | ✅ ²⁷ | — | — | — | ✅ ¹⁴ | — | ✅ ¹⁴ | ◐ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁶ | n/a | — | — | — | — ³⁶ |
 | White 2 (DS) | USA/Europe | ✅ ¹⁴ | ✅ ²⁷ | — | — | — | ✅ ¹⁴ | — | ✅ ¹⁴ | ◐ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁶ | n/a | ✅ ⁵⁴ | — | — | — ³⁶ |
 | White 2 (DS) | France, Germany, Spain, Italy, Korea; Japan rev 1 ³¹ | ✅ ¹⁴ | ✅ ²⁷ | — | — | — | ✅ ¹⁴ | — | ✅ ¹⁴ | ◐ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁶ | n/a | — | — | — | — ³⁶ |
-| Origin HeartGold (DS) | 4.0.3 English 1.0.0 | ✅ ¹⁴ | — ²⁹ | — | — | — | ✅ ²⁹ | — | ✅ ²⁹ | ✅ ¹⁴ | ✅ ²⁹ | ✅ ²⁹ | — | n/a | — | — | — | — ³⁶ |
+| Origin HeartGold (DS) | 4.0.3 English 1.0.0 | ✅ ¹⁴ | ✅ ²⁹ | — | — | — | ✅ ²⁹ | — | ✅ ²⁹ | ✅ ¹⁴ | ✅ ²⁹ | ✅ ²⁹ | ✅ ¹⁶ | n/a | — | — | — | — ³⁶ |
 | Heartfelt Gold (DS) | 1.0.15 (+ Zoomed In) | ✅ ³⁷ | ✅ ³⁷ | — | — | — | ✅ ³⁷ | — | ✅ ³⁷ | — | ✅ ³⁷ | ✅ ³⁷ | — | n/a | — | — | — | — ³⁶ |
 | Sacred Gold (DS), Storm Silver (DS) | 1.05 (Sacred Gold's Classic too) | ✅ ⁴³ | ◐ ⁴³ | — | — | — | ◐ ⁴³ | — | ✅ ⁴³ | ◐ ⁴³ | ◐ ⁴³ | ◐ ⁴³ | — | n/a | — | — | — | — ³⁶ |
 | Renegade Platinum (DS) | 1.3.0 (+ Classic, shiny rate, Speed Up), 1.2.0 | ✅ ³² | ✅ ³² | — | — | — | ✅ ³² | — | ✅ ³² | ◐ ³² | ◐ ³² | ✅ ³² | — | n/a | — | — | — | — ³⁶ |
@@ -289,7 +289,8 @@ change to any of the places listed under "Where it's decided" updates its rows h
 16. Built into the game: its own TMs never run out, so there's nothing to patch and the row shows ON, greyed
     (`ReusableTms.BUILT_IN`). Radical Red, Unbound and SoulGold checked headless on their saves (a TM taught, unpatched,
     stayed in the TM Case / bag: SoulGold v1.1.4 and v1.2's third build, the others share its code); Prism and Polished
-    Crystal keep a bit per TM, no count.
+    Crystal keep a bit per TM, no count. Origin HeartGold checked headless on a new game (TM01 taught from the bag, still
+    there with its count of 1); it runs as HEARTGOLD, so `ReusableTms.builtIn` checks its flag too.
 17. SoulGold: the Repels only (USE on the bag, the QUICK MENU's REPEL), its own item ids 114..116 and its expansion
     Repel rules (a Lure's bit 15 in VAR_REPEL_STEP_COUNT, VAR_LAST_REPEL_LURE_USED 0x40BD), every build
     (`scripts/find_field_items_soulgold.py`); checked headless on v1.2 with a player's save (GitHub #242: the bag 5 -> 4,
@@ -474,10 +475,14 @@ change to any of the places listed under "Where it's decided" updates its rows h
     found through the US code that uses it (`pk_nds_field.cpp`'s `ORIGIN_HEARTGOLD`, `pk_nds_call.cpp`'s `ORIGIN_HEARTGOLD`).
     PC anywhere and FLY ran headless through its own script engine and flight task (landed in Pallet Town); WILD ENCOUNTERS'
     cart rates come from its map headers and encounter archive (`NdsArt.readOrigin`). Its battle engine is its own (a
-    manager at 0x02255BAC, no BattleSystem): the BATTLE tab reads its battle objects (`Gen4ManagedBattle`), but there are no
-    battle buttons (its panels aren't HeartGold's): DS LAYOUT floats the game's
-    touch screen in while its battle UI's input handler is set (+0x238 -> +0x10: the commands, the moves, the party), and
-    SMART FF slows down then. EXPAND and STEADY music work as HeartGold's (widecheck's overlap as US HeartGold's).
+    manager at 0x02255BAC, no BattleSystem): the BATTLE tab reads its battle objects (`Gen4ManagedBattle`). Its commands and
+    moves sit where HeartGold's do, so BATTLE BUTTONS press them with HeartGold's taps (`NdsBattleTaps.GEN4`): its battle
+    UI's input handler is set while it waits (+0x238 -> +0x10) and another UI object (+0x234) runs the waiting panel's
+    handler at +0x57C (0x02202445 the commands, 0x02202F4D the moves, 0x02202955 the bag, 0x0220270D the party;
+    `readManagedBattleInput`, `battleTouch`), checked headless in a wild and a trainer battle. Not the panel's id at
+    +0x580: the bag and the party share one, and on the way back to the commands after a turn it still reads the moves'
+    for a few frames while the commands' handler runs. The bag, the party and any other panel float the game's touch
+    screen in (DS LAYOUT), and SMART FF slows down while it waits. No POKéMON switch (its party panel isn't HeartGold's). EXPAND and STEADY music work as HeartGold's (widecheck's overlap as US HeartGold's).
 30. A FireRed (rev 0 / 1) or Emerald hack nothing knows by its hash, made by editing retail in place: `RetailEngine.kt`
     proves from its code that it kept retail's engine (every RAM global these features use is loaded by retail's code,
     unchanged, from a pool word still holding retail's address; docs/DEVELOPMENT.md's "Retail engine"). Proven, it gets
@@ -861,7 +866,7 @@ change to any of the places listed under "Where it's decided" updates its rows h
   invisible sprite whose callback is SpriteCallbackDummy (`SwitchAddrs.cursorSpriteCallback`), checked headless on English and French
   Ruby rev 1 (DOWN, A, SHIFT sent slot 1 in; gPlayerParty in battle order while the menu is up, as FireRed's); not Japanese R / S.
 - **Hide battle menu** (two screens; not a column: it follows the battle buttons): `PokeDaisyActivity.battleMenuHideSupported`
-  (a BPR / BPG / BPE header running as FireRed / Emerald with the battle buttons' addresses and the one-press picks' cursors:
+  (a BPR / BPG / BPE header, or Ultra Violet's PUVV, running as FireRed / Emerald with the battle buttons' addresses and the one-press picks' cursors:
   the D-pad steers the hidden action menu by writing gActionSelectionCursor, `HiddenMenuSteer`), the menus found on screen by
   `pk_wide.c`'s `menuHideBegin` (no address of its own; gBattleTypeFlags keeps doubles' and the Safari Zone's). Checked
   headless on English FireRed rev 1 and Emerald (mgba_dump `battlemenu`), then (2026-11-15) a wild battle in every covered
@@ -873,7 +878,8 @@ change to any of the places listed under "Where it's decided" updates its rows h
   edge with the frame's T + 6 tile, so the plain middle is T + 7 (the Western ones' too). Ruby / Sapphire too (2026-11-18): their cursor is
   sprites (menu_cursor.c), hidden for the frame with the menu (the shown OBJ entries whose top is inside the box), and their empty
   message box has no text tiles of its own, so the sign borrows the hidden menu's (off screen that frame); both menus hidden with the
-  sign drawn on English Ruby rev 1.
+  sign drawn on English Ruby rev 1. Ultra Violet too (2026-11-24): FireRed rev 0 under its own code PUVV, which the check now takes;
+  both menus hidden with the sign drawn on its own save.
 - **One-press picks**: `NativeConfig.actionCursor` / `moveCursor`, handed out only for a hash-verified ROM
   (`TelemetrySampler.knownCursorAddrs`; a randomized retail ROM's masked hash counts, `RandomizedRetail`), or for a hack
   whose code proves retail's engine (`RetailEngine`, note 30). Configs made with `.copy()` inherit them: zero them where the RAM moved.

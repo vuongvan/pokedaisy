@@ -102,6 +102,7 @@ static u64 frameCount = 0;
 static u64 frameCount_() { return frameCount; }
 static int wideMargin = 0;   // wide MX [MY]: EXPAND drawn every frame (pk_nds_wide.cpp)
 static int wideMarginY = 0;
+static int foreignProps = 1; // foreignprops 0: another area's map props left as the game draws them (pk_nds_field_foreign_props)
 // look DX DY: the window (wide's, at first) moved DX, DY DS pixels a frame, as the look-around moves it - set before
 // each frame as the app sets it (pk_nds_wide_need), the GPU path composing that frame's window
 static int lookX = 0, lookY = 0, lookDX = 0, lookDY = 0;
@@ -295,9 +296,14 @@ static void runFrames(int n, u32 keys)
 #ifdef NDS_DUMP_GL
         if (gpuOn) pk_nds_gl_begin_frame();
 #endif
+        const PkNdsFieldGame* propsGame = nullptr;
+        if (wideMargin && foreignProps)
+            if (auto* cart = nds->NDSCartSlot.GetCart()) propsGame = pk_nds_field_game_rom(cart->GetROM(), cart->GetROMLength());
+        pk_nds_field_foreign_props(propsGame, read32, write32, 1);
         inFrame = true;
         nds->RunFrame();
         inFrame = false;
+        pk_nds_field_foreign_props(propsGame, read32, write32, 0);
         frameCount++;
         static int wasBattle = 0;
         int battle = 0, inBattle = 0, battle3d = 0;
@@ -653,6 +659,9 @@ int main(int argc, char** argv)
             // look DX DY: from here on the window moves DX, DY DS pixels a frame (look 0 0 stops it where it is)
             lookDX = (int) num(a);
             lookDY = n > 2 ? (int) num(b) : 0;
+        } else if (!strcmp(cmd, "foreignprops")) {
+            // foreignprops 1/0: another area's map props hidden for each frame under EXPAND, as the app does (default 1)
+            foreignProps = (int) num(a);
         } else if (!strcmp(cmd, "wide")) {
             // wide MX [MY]: EXPAND with MX DS pixels left and right, MY above and below (0 = off; MY defaults to 0)
             wideMargin = (int) num(a);

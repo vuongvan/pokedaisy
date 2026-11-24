@@ -1,6 +1,6 @@
 ---
 // Light, modern page - soft colour, lots of air - with every border, button and icon drawn in whole pixels.
-// Titles, labels and buttons are in the app's pixel font (Pixel Operator); reading text is Atkinson Hyperlegible,
+// Titles and labels are in the app's pixel font (Pixel Operator); buttons are Rubik; reading text is Atkinson Hyperlegible,
 // the manual's. A dark page follows the visitor's system setting, or the header's switch once they've used it.
 import Pixel from '../components/Pixel.astro';
 import BetaModal from '../components/BetaModal.astro';
@@ -233,7 +233,7 @@ const petals = [[4, 22, 1, 0, 22], [91, 10, 2, 4, 26], [70, 62, 1, 9, 24], [10, 
           <a href={PATREON_URL}>PATREON</a>
           <a href={COFFEE_URL}>{tr('BUY ME A COFFEE')}</a>
         </div>
-        <p class="legal tiny muted" set:html={tr('PokeDaisy is a fan project, not affiliated with or endorsed by Nintendo, Game Freak, Creatures or The Pokémon Company. Pokémon and all related names are trademarks of their respective owners; Game Boy, Game Boy Color, Game Boy Advance and Nintendo DS are trademarks of Nintendo. Device names belong to their makers, and ScreenScraper, RetroAchievements and SteamGridDB are independent services. ROM hacks belong to their creators. No games are included: use your own legally dumped ROMs. Games run on <a href="https://mgba.io">mGBA</a> and <a href="https://melonds.kuribo64.net">melonDS</a>; fonts: Pixel Operator by Jayvee Enaguas (CC0), PixelMplus by Itouhiro (M+ FONT LICENSE), Galmuri by Lee Minseo (OFL) and Atkinson Hyperlegible by the Braille Institute (OFL).')} />
+        <p class="legal tiny muted" set:html={tr('PokeDaisy is a fan project, not affiliated with or endorsed by Nintendo, Game Freak, Creatures or The Pokémon Company. Pokémon and all related names are trademarks of their respective owners; Game Boy, Game Boy Color, Game Boy Advance and Nintendo DS are trademarks of Nintendo. Device names belong to their makers, and ScreenScraper, RetroAchievements and SteamGridDB are independent services. ROM hacks belong to their creators. No games are included: use your own legally dumped ROMs. Games run on <a href="https://mgba.io">mGBA</a> and <a href="https://melonds.kuribo64.net">melonDS</a>; fonts: Pixel Operator by Jayvee Enaguas (CC0), PixelMplus by Itouhiro (M+ FONT LICENSE), Galmuri by Lee Minseo (OFL), Atkinson Hyperlegible by the Braille Institute (OFL) and Rubik by the Rubik Project Authors (OFL).')} />
       </div>
     </footer>
 
@@ -290,6 +290,8 @@ const petals = [[4, 22, 1, 0, 22], [91, 10, 2, 4, 26], [70, 62, 1, 9, 24], [10, 
      system's own fonts. */
   @font-face { font-family: 'Atkinson Hyperlegible'; src: url('/fonts/AtkinsonHyperlegible-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
   @font-face { font-family: 'Atkinson Hyperlegible'; src: url('/fonts/AtkinsonHyperlegible-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+  /* Buttons: Rubik Medium, cut to Latin (website/public/fonts/LICENSE-Rubik.txt). */
+  @font-face { font-family: 'Rubik'; src: url('/fonts/Rubik-Medium.woff2') format('woff2'); font-weight: 500; font-display: swap; }
   @font-face { font-family: 'Atkinson Hyperlegible'; src: url('/fonts/AtkinsonHyperlegible-Italic.ttf') format('truetype'); font-weight: 400; font-style: italic; font-display: swap; }
   /* Japanese, glyph by glyph, like the app's PixelTypeface: PixelMplus at Pixel Operator's pixel, cut to the
      characters the site's Japanese uses (scripts/gen_site_jp_font.py). Only fetched where one is drawn. */
@@ -323,6 +325,7 @@ const petals = [[4, 22, 1, 0, 22], [91, 10, 2, 4, 26], [70, 62, 1, 9, 24], [10, 
     --r-s: 16px;
     --r-xs: 14px;
     --font-pixel: 'Pixel Operator', 'PixelMplus JP', 'Galmuri KO', monospace;
+    --font-ui: 'Rubik', 'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Apple SD Gothic Neo', sans-serif;
     --font-read: 'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Apple SD Gothic Neo', sans-serif;
     /* Pixel bold: each glyph again, one font pixel to the right (how the app bolds Gen 1's font). */
     --bold: 0.0625em 0 0 currentColor;
@@ -384,7 +387,7 @@ const petals = [[4, 22, 1, 0, 22], [91, 10, 2, 4, 26], [70, 62, 1, 9, 24], [10, 
   img { max-width: 100%; }
   h1, h2, h3, h4 { font-weight: normal; margin: 0; line-height: 1.15; }
   /* The pixel font: titles, labels, buttons and the bar. Everything else reads in --font-read. */
-  h1, h2, h3, h4, button, .btn, .chip, .eyebrow, .heading, .topbar, .foot-name, .foot-links, .pf { font-family: var(--font-pixel); }
+  h1, h2, h3, h4, .chip, .eyebrow, .heading, .topbar, .foot-name, .foot-links, .pf { font-family: var(--font-pixel); }
   p { margin: 0; }
   .small { font-size: var(--r-s); }
   .tiny { font-size: var(--r-xs); }
@@ -482,10 +485,12 @@ const petals = [[4, 22, 1, 0, 22], [91, 10, 2, 4, 26], [70, 62, 1, 9, 24], [10, 
     .lang-code { display: none; }
   }
 
-  /* Buttons: pixel frames that lift on hover and press down on click. */
+  /* Buttons: pixel frames that lift on hover and press down on click, their words in the reading font. */
+  button, button.chip { font-family: var(--font-ui); }
   .btn {
     display: inline-flex; align-items: center; gap: 12px;
-    font: inherit; font-family: var(--font-pixel); font-size: var(--t-m); line-height: 1; color: var(--ink); text-decoration: none;
+    font: inherit; font-family: var(--font-ui); font-weight: 500; font-size: var(--r-m); line-height: 1.1; letter-spacing: 0.02em;
+    color: var(--ink); text-decoration: none;
     padding: calc(var(--px) * 3) calc(var(--px) * 5);
     cursor: pointer; background: none;
     filter: drop-shadow(0 calc(var(--px) * 2) 0 var(--ink));
@@ -494,9 +499,9 @@ const petals = [[4, 22, 1, 0, 22], [91, 10, 2, 4, 26], [70, 62, 1, 9, 24], [10, 
   .btn:hover { transform: translateY(calc(var(--px) * -1)); filter: drop-shadow(0 calc(var(--px) * 3) 0 var(--ink)); }
   .btn:active { transform: translateY(calc(var(--px) * 2)); filter: drop-shadow(0 0 0 var(--ink)); }
   .btn:focus-visible { outline: var(--px) dashed var(--red); outline-offset: calc(var(--px) * 2); }
-  .btn.small { font-size: var(--t-s); padding: calc(var(--px) * 2) calc(var(--px) * 3); gap: 8px; }
+  .btn.small { font-size: var(--r-s); padding: calc(var(--px) * 2) calc(var(--px) * 3); gap: 8px; }
   .btn.primary { color: #fff; text-shadow: var(--px) var(--px) 0 #8a1410; }
-  .btn.big { font-size: var(--t-m); padding: calc(var(--px) * 5) calc(var(--px) * 7); }
+  .btn.big { font-size: calc(var(--r-m) + 1px); padding: calc(var(--px) * 5) calc(var(--px) * 7); }
 
   /* Cards: white, ink-outlined, a hard pixel shadow. */
   .card { filter: var(--hard-shadow); padding: calc(var(--px) * 6); }

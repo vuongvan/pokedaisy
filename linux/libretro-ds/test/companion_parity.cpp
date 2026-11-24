@@ -195,7 +195,7 @@ int main(int argc,char**argv) {
   upcoming=bosses();
   assert(upcoming[0].title.find("(NORMAL)")!=std::string::npos);
   assert(upcoming[3].title.find("(CHALLENGE)")!=std::string::npos);
-  assert(upcoming[0].detail.find("ASPERTIA CITY GYM - 2 POKéMON")!=std::string::npos);
+  assert(upcoming[0].detail.find("ASPERTIA CITY GYM · 2 POKéMON")!=std::string::npos);
   progress.badges=0xff;progress.eventFlags.assign(383,0);setFlag(0x375);
   assert(bosses()[1].detail=="Lv56");
   setFlag(0x960);

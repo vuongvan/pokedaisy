@@ -294,8 +294,9 @@ pixel, so there its text was as large for the screen as on a GBA): `LocalTextSte
    reference" errors — delete `build/kotlin` if errors look impossible).
 
 **The menus' look is SUMMARY MINT** (2026-11-12, the user's pick of eight looks tried; `theme/UiStyle.kt`, `UiStyles`,
-`OptionColors.style`): the OPTION pieces below drawn over a `UiStylePalette` - Emerald's summary pages (sampled headless): a teal
-header joined to a mint list window (`OptionTitleWindow(joined)`, `WindowGap`), green section bands (`StyledGroupTitle`), banded
+`OptionColors.style`): the OPTION pieces below drawn over a `UiStylePalette` - Emerald's summary pages (sampled headless), in PokeDaisy's
+blue since 1.6.2 (`retroStylePalette`; the teal kept as `summaryMintTealPalette`; a THEME rehues it, `themedStylePalette`): a blue
+header joined to a pale list window (`OptionTitleWindow(joined)`, `WindowGap`), green section bands (`StyledGroupTitle`), banded
 rows, SETTINGS' / GUIDE's group tabs as folder tabs on the window's side (`FolderTab`), tab chips and `OptionButton`s as keys
 (`KeyColors`, `drawKey`: an edge under them, the open tab pressed in), tighter margins. Data goes in blocks of connected cells
 (`cell()` / `HeadCell` / `CellColors`, HG and Black's summary; 1.5 GBA px lines, the window round them with `margin`): battle INFO /
@@ -806,7 +807,8 @@ the software renderer, pixel for pixel. Check GPU changes headless with nds_dump
 It runs as `GameKind.HEARTGOLD` with `originHeartGold` set (`GEN4_ORIGIN_HEARTGOLD`, `pk_nds_field.cpp` / `pk_nds_call.cpp`'s
 `ORIGIN_HEARTGOLD`, callSet 7) and its own tables read from the cart (`NdsArt.readOrigin`: 1440 species / forms, 920 moves,
 Fairy = 9, its type chart, icons, its DEX's pages): never bundled. Its battle engine is its own: the BATTLE tab reads its
-battle objects (`Gen4ManagedBattle`), no battle buttons, the touch screen floats in while its battle waits (`battleManagerPtr`).
+battle objects (`Gen4ManagedBattle`); BATTLE BUTTONS press its commands and moves (HeartGold's places; the waiting panel's handler at
+manager +0x234 -> +0x57C, never its id), the touch screen floats in for the rest (`battleManagerPtr`).
 No GUIDE. Fixtures `origin_heartgold(_battle, _trainer)`; docs/DEVELOPMENT.md's "Origin HeartGold".
 **Heartfelt Gold v1.0.15 (2026-11-16)**: hg-engine over the *US* HeartGold (`HeartfeltGold.matches`: ARM9 / overlay table sizes),
 the US RAM and battle system, so the native side (EXPAND, FLY, PC, WILD, battle buttons) runs it as HeartGold unchanged. Its species ids are

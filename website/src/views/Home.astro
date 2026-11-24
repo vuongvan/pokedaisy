@@ -9,6 +9,7 @@ import data from '../data/compat.json';
 import { REPO_URL, formatDate, getReleases, getDownloads, highlights } from '../lib/releases.js';
 import { REDDIT_URL, DISCORD_URL, KOFI_URL, PATREON_URL, COFFEE_URL } from '../lib/links.js';
 import { trFor, msg } from '../i18n/index.js';
+import { loadRomFeatures, UNLISTED } from '../lib/romFeatures.js';
 
 const tr = trFor(Astro.url);
 
@@ -37,6 +38,10 @@ const expandShots = [
   ['firered-field', 'FireRed'], ['soulgold-expand', 'SoulGold'], ['rogue-expand', 'Emerald Rogue'], ['lazarus-expand', 'Lazarus'],
   ['monomyth-expand', 'Monomyth'], ['mariomon-expand', 'Super Mariomon'], ['recharged-yellow-expand', 'Recharged Yellow'], ['yellow-field', 'Yellow'],
 ];
+// How many more games EXPAND works in than the tabs show (docs/ROM_FEATURES.md, a game's versions counted once).
+const expandGames = new Set(loadRomFeatures().rows
+  .filter((r) => !r.blocked && !UNLISTED.includes(r.game) && ['yes', 'part'].includes(r.cells.EXPAND)).map((r) => r.game)).size;
+const expandMore = Math.max(0, expandGames - expandShots.length);
 // Everything else, short: the chores and the player.
 const more = [
   ['pc', msg('PC ANYWHERE'), msg('Open your PC boxes from the bag, the HUD or the quick menu, wherever you stand. No walk back to a Pokémon Center.')],
@@ -66,11 +71,23 @@ const HERO_SIZES = {
 const ticker = ['GB · GBC · GBA · DS', msg('TWO SCREENS OR ONE'), msg('PARTY'), msg('BAG'), msg('BATTLE'), msg('MAP'), msg('DEX'), msg('GUIDE'), msg('TRAINER CARD'), msg('SAVE STATES'), msg('HUD'), msg('QUICK MENU'), msg('EXPAND'), msg('PC ANYWHERE'), msg('FREE FLIGHT'), msg('FAST-FORWARD'), msg('SHADERS'), msg('ACHIEVEMENTS')]
   .map((t) => tr(t)).concat(tr('{n} GAMES', { n: gameCount }));
 const title = 'POKEDAISY'.split('');
+// The thank-you bar under the header (100,000 downloads, November 2026): the number in the page's own digits, drawn apart.
+const milestone = (100000).toLocaleString(tr.locale);
+const [thanksBefore, thanksAfter] = tr('THANK YOU FOR {n} DOWNLOADS!', { n: milestone }).split(milestone);
 ---
 <Base
   title={tr('PokeDaisy: Game Boy Pokémon with a live companion')}
   description={tr('A free player for Game Boy, Game Boy Color, Game Boy Advance and Nintendo DS Pokémon games on Android handhelds with two screens or one: the game, and a live companion with your party, battles, map, dex and guide on the second screen or right beside it, plus a HUD and a quick menu on the game screen.')}
 >
+  <!-- Thanks for 100,000 downloads: a strip between the header and the page. -->
+  <div class="thanks" role="note">
+    <div class="container thanks-in">
+      <span class="thanks-bloom" aria-hidden="true"><Pixel name="logo" scale={0.5} /></span>
+      <p class="thanks-text">{thanksBefore}<span class="thanks-num">{milestone}</span>{thanksAfter}</p>
+      <span class="thanks-heart" aria-hidden="true"><Pixel name="heart" scale={1} /></span>
+    </div>
+  </div>
+
   <!-- Hero -->
   <section class="hero container">
     <div class="hero-copy" data-track-where="hero">
@@ -176,6 +193,7 @@ const title = 'POKEDAISY'.split('');
       <div class="viewer-screen f-card">
         {expandShots.map(([shot, game], i) => <img src={media(`${shot}.webp`)} alt={tr('{game} with EXPAND', { game })} class:list={[i === 0 && 'on']} loading="lazy" decoding="async" />)}
       </div>
+      {expandMore > 0 && <a class="viewer-more btn f-btn h-btnHot small" href="#games"><Pixel name="star" scale={0.667} /> {tr('+{n} MORE GAMES WITH EXPAND', { n: expandMore })}</a>}
     </div>
   </section>
 
@@ -249,7 +267,7 @@ const title = 'POKEDAISY'.split('');
     <div class="player-grid">
       {more.map(([icon, name, text], i) => (
         <article class="player-item" data-reveal style={`--i:${i % 3}`}>
-          <span class="player-icon f-card"><Pixel name={icon} scale={1} /></span>
+          <span class="player-icon f-card"><Pixel name={icon} scale={icon === 'single' ? 0.667 : 1} /></span>
           <div>
             <h3 class="player-name">{tr(name)}</h3>
             <p class="small muted">{tr(text)}</p>
@@ -345,8 +363,31 @@ const title = 'POKEDAISY'.split('');
 </Base>
 
 <style>
+  .thanks {
+    position: relative; overflow: hidden; color: #fff; background-color: #3d6fe0; /* PokeDaisy's blue in light and dark */
+    border-bottom: var(--px) solid var(--ink);
+    background-image: radial-gradient(rgba(255, 255, 255, 0.16) var(--px), transparent var(--px));
+    background-size: calc(var(--px) * 6) calc(var(--px) * 6);
+  }
+  .thanks-in { display: flex; align-items: center; justify-content: center; gap: 14px; min-height: 52px; padding: 8px 0; text-align: center; }
+  .thanks-text {
+    font-family: var(--font-pixel); font-size: var(--t-m); line-height: 1.15; letter-spacing: 0.0625em;
+    text-shadow: var(--bold), calc(var(--px) * 1) calc(var(--px) * 1) 0 rgba(29, 27, 38, 0.45);
+  }
+  .thanks-num { color: var(--yellow); }
+  .thanks-bloom, .thanks-heart { display: inline-flex; flex: none; animation: bob 1.2s var(--step) infinite; }
+  .thanks-heart { animation-delay: 0.6s; }
+  @media (max-width: 560px) {
+    .thanks-in { gap: 10px; }
+    .thanks-text { font-size: var(--t-s); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .thanks-bloom, .thanks-heart { animation: none; }
+  }
   /* Hero */
   .hero { display: grid; grid-template-columns: 1fr 1.05fr; gap: 48px; align-items: center; padding: 64px 0 56px; }
+  /* Large screens: the words sit a little above the devices' middle (the margin lifts them half its height). */
+  @media (min-width: 1200px) { .hero-copy { margin-bottom: min(120px, 6vw); } }
   .hero-head { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
   .hero-mark { position: relative; width: max-content; }
   .mark-ball { display: inline-block; transform-origin: 50% 85%; animation: capture 3.2s steps(1) infinite 1.2s; }
@@ -377,7 +418,7 @@ const title = 'POKEDAISY'.split('');
   .hero-lead { margin: 22px 0 30px; max-width: 32em; font-size: calc(var(--r-l) * 1.1); line-height: 1.5; color: var(--ink-2); text-wrap: pretty; }
   @keyframes bob { 50% { transform: translateY(var(--px)); } }
   .cta { display: flex; flex-wrap: wrap; gap: 16px 20px; align-items: center; }
-  .ver { opacity: 0.85; font-size: var(--t-m); margin-left: 4px; }
+  .ver { opacity: 0.85; font-size: 0.85em; margin-left: 4px; }
   .community { margin-top: 18px; }
   .platforms, .downloads, .tick, .tab-name { font-family: var(--font-pixel); }
   .platforms { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-2); text-decoration: none; font-size: var(--t-s); letter-spacing: 0.0625em; }
@@ -433,8 +474,12 @@ const title = 'POKEDAISY'.split('');
 
   /* EXPAND, one game at a time under tabs (the game pages' viewer). */
   .viewer { max-width: 1000px; margin: 0 auto; display: grid; gap: 18px; }
-  .viewer-tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
-  .viewer-tabs .btn.on { color: var(--red); text-shadow: var(--bold); }
+  /* The games in even rows: four across (two rows of four), two across on a phone. */
+  .viewer-tabs { display: grid; grid-template-columns: repeat(4, auto); justify-content: center; gap: 14px; }
+  .viewer-tabs .btn { justify-content: center; white-space: nowrap; }
+  .viewer-tabs .btn.on { color: var(--red); }
+  @media (max-width: 560px) { .viewer-tabs { grid-template-columns: repeat(2, auto); } }
+  .viewer-more { justify-self: center; margin-top: 6px; }
   .viewer-screen { display: grid; padding: calc(var(--px) * 3); filter: var(--hard-shadow); }
   .viewer-screen img { grid-area: 1 / 1; display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; opacity: 0; transition: opacity 0.3s ease; }
   .viewer-screen img.on { opacity: 1; }
@@ -457,7 +502,12 @@ const title = 'POKEDAISY'.split('');
   .player-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px 32px; }
   .player-item { display: flex; gap: 20px; align-items: flex-start; }
   .player-item p { line-height: 1.5; }
-  .player-icon { display: inline-flex; padding: calc(var(--px) * 3); filter: var(--hard-shadow); transition: transform 0.2s steps(2); }
+  /* Every icon in a box of one size (its frame 3 units a side), centred in it. */
+  .player-icon {
+    display: inline-flex; align-items: center; justify-content: center; flex: none; box-sizing: border-box;
+    width: calc(var(--px) * 22); height: calc(var(--px) * 22); padding: 0;
+    filter: var(--hard-shadow); transition: transform 0.2s steps(2);
+  }
   .player-item:hover .player-icon { transform: rotate(-8deg) translateY(calc(var(--px) * -2)); }
   .player-name { font-size: var(--t-m); margin-bottom: 6px; text-shadow: var(--bold); letter-spacing: 0.0625em; }
 

@@ -649,7 +649,7 @@ SPRITES.tmDisc = {
 };
 SPRITES.run = {
   pal: { K: INK, R: '#e83028', W: '#ffffff' },
-  rows: ['.....KKKK...', '.....KRRK...', '.....KRRK...', 'K....KRRKK..', '.....KRRRRK.', 'KK..KRRRRRRK', '...KRRWRRRRK', 'K.KRRRWRRRRK', '.KWWWWWWWWWK', '.KKKKKKKKKKK'],
+  rows: ['.....KKKK...', '.....KRRK...', 'KK...KRRK...', '.....KRRKK..', 'KK...KRRRRK.', '....KRRRRRRK', 'KK.KRRWRRRRK', '..KRRRWRRRRK', '.KWWWWWWWWWK', '.KKKKKKKKKKK'],
 };
 SPRITES.zoom = {
   pal: { K: INK, U: '#58a0f0', W: '#d8f0ff', S: '#909098' },
@@ -872,7 +872,8 @@ SPRITES.iphone = {
     '....KKKKKKKKKKKKKKKKKK....', '.....KKKKKKK..KKKKKKK.....', '..........................',
   ],
 };
-SPRITES.pc = {
+// The download cards' desktop PC (Linux / Windows), big; the quality-of-life cards' small PC is SPRITES.pc above.
+SPRITES.desktop = {
   pal: { K: '#202020', S: '#909098', U: '#58a0f0', W: '#d8f0ff' },
   rows: [
     'KKKKKKKKKKKKKKKKKKKKKKKKKKKKKK', 'KSSSSSSSSSSSSSSSSSSSSSSSSSSSKK', 'KSSSSSSSSSSSSSSSSSSSSSSSSSSSKK',

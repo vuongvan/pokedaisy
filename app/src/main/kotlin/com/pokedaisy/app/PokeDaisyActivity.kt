@@ -1664,7 +1664,9 @@ class PokeDaisyActivity : Activity() {
                 if (flyer == null || flyer.first != targets.flyerSlot || flyer.second != targets.flyerPersonality) {
                     return done(com.pokedaisy.app.companion.data.FlyResult.NO_FLYER)
                 }
+                // The flight is the game's to show: the window goes, and the HUD's map panel it may come from.
                 closeCompanionWindow()
+                hudCloseTick.intValue++
                 // The job's result 1 is the flight's event: none when the game's own check said no (walked indoors since).
                 var refused = false
                 dsAction(MgbaCore.NDS_ACTION_FLY, intArrayOf(flyer.first, spot.mapHeader, 0, 0), ran = { res ->
@@ -1691,6 +1693,7 @@ class PokeDaisyActivity : Activity() {
                     return done(com.pokedaisy.app.companion.data.FlyResult.NO_FLYER)
                 }
                 closeCompanionWindow()
+                hudCloseTick.intValue++
                 dsAction(MgbaCore.NDS_ACTION_FLY, intArrayOf(flyer.first, spot.mapHeader, spot.x, spot.z)) { o ->
                     done(when (o.result) {
                         com.pokedaisy.app.companion.data.ItemUseResult.USED -> com.pokedaisy.app.companion.data.FlyResult.OK
@@ -1761,7 +1764,9 @@ class PokeDaisyActivity : Activity() {
      * menuHideBegin; Ruby / Sapphire's cursor sprites hidden with it, the sign drawn in the hidden menu's own tiles) whose
      * battles the companion's buttons can steer (the battle input read). */
     private fun battleMenuHideSupported() = !romIsGameBoy && !romIsNds && romBlocked == null && ::engine.isInitialized &&
-        listOf("BPR", "BPG", "BPE", "AXV", "AXP").any { romCode.startsWith(it) } &&
+        // Ultra Violet (PUVV) is FireRed rev 0 under a code of its own: checked headless, both menus hidden, the sign drawn.
+        (listOf("BPR", "BPG", "BPE", "AXV", "AXP").any { romCode.startsWith(it) } ||
+            romCode.startsWith(com.pokedaisy.app.companion.data.TelemetrySampler.ULTRA_VIOLET_CODE)) &&
         com.pokedaisy.app.companion.data.activeGame.let {
             it == com.pokedaisy.app.companion.data.GameKind.FIRERED || it == com.pokedaisy.app.companion.data.GameKind.EMERALD
         } && com.pokedaisy.app.companion.data.activeNativeConfig?.hasBattleInputAddrs == true &&
@@ -1890,7 +1895,8 @@ class PokeDaisyActivity : Activity() {
             if (on) com.pokedaisy.app.companion.FeatureTips.used(TipId.REUSABLE_TMS)
             stored.setReusableTms(on)
             if (::engine.isInitialized) engine.setReusableTms(tmSites, on)
-            if (::engine.isInitialized) engine.dsReusableTms = on && dsInstantTextWorks()
+            // Origin HeartGold's TMs never run out by themselves: no patch where the row reads ON, greyed.
+            if (::engine.isInitialized) engine.dsReusableTms = on && dsInstantTextWorks() && !com.pokedaisy.app.companion.data.ReusableTms.builtIn
         }
         override val reusableTmsSupported get() = tmSites.isNotEmpty() || dsInstantTextWorks()
         override fun setInstantText(on: Boolean) {
@@ -2050,8 +2056,7 @@ class PokeDaisyActivity : Activity() {
         }
         override val autoRunBuiltIn get() =
             com.pokedaisy.app.companion.data.activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN
-        override val reusableTmsBuiltIn get() =
-            com.pokedaisy.app.companion.data.activeGame in com.pokedaisy.app.companion.data.ReusableTms.BUILT_IN
+        override val reusableTmsBuiltIn get() = com.pokedaisy.app.companion.data.ReusableTms.builtIn
         override val ffToggled get() = if (romIs3ds) n3dsFfOn else if (::engine.isInitialized) engine.fastForwardToggled else false
         override fun setFfToggled(on: Boolean) {
             if (romIs3ds) {
@@ -3098,7 +3103,7 @@ class PokeDaisyActivity : Activity() {
         e.setReusableTms(tmSites, p.reusableTms)
         e.setInstantText(textPatch, p.instantText)
         e.dsInstantText = p.instantText && dsInstantTextWorks()
-        e.dsReusableTms = p.reusableTms && dsInstantTextWorks()
+        e.dsReusableTms = p.reusableTms && dsInstantTextWorks() && !com.pokedaisy.app.companion.data.ReusableTms.builtIn
         e.setHmFree(hmPatch, p.hmFree)
         e.setExpShare(expShareFound, if (expShareFound != null) com.pokedaisy.app.companion.data.ExpShare.Mode.of(p.expShare) else com.pokedaisy.app.companion.data.ExpShare.Mode.OFF)
         e.setLevelCap(levelCapFound, if (levelCapFound != null && p.levelCap) levelCapNow?.level ?: 0 else 0)

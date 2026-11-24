@@ -158,7 +158,8 @@ object OptionColors {
                 activeGame == com.pokedaisy.app.companion.data.GameKind.UNBOUND &&
                 (inGame || com.pokedaisy.app.companion.ui.theme.UiStyles.override != null)
             if (unbound) com.pokedaisy.app.companion.ui.theme.unboundStylePalette(dark)
-            else com.pokedaisy.app.companion.ui.theme.uiStylePalette(current, dark)
+            // A THEME moves the whole style to its colour (POKéDAISY's hue is null: the blues as they are).
+            else com.pokedaisy.app.companion.ui.theme.themedStylePalette(current, dark, AppColors.theme.hue)
         }
     /** A MENU STYLE joins its windows edge to edge: a title strip straight on its list, tabs on the window's side. */
     val joined get() = style != null

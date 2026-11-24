@@ -178,9 +178,18 @@ struct Wide {
     std::vector<melonDS::Polygon*> gpuRender;
     WidePolygonList gpuList;
     PkNdsWidePlan plan;
+    // The ground's colour at the screen's left / right edge, by bands of 8 rows (15-bit, NO_FILL where none held), from
+    // the last field frame shown: what a margin's untextured ground (unboundTexture) is drawn in.
+    u16 fill[2][H3D / 8];
+    u32 groundLit = 0xFFFFFFFF; // the lit colour of the last repeating unbound material (unboundGround)
+    bool fillReady = false;
 };
 
+constexpr u16 NO_FILL = 0xFFFF;
 Wide wide;
+// The polygon being submitted is unbound ground (onSubmit -> storePolygon)
+bool fillNow = false;
+bool groundFill = false;   // Gen 4's field (pk_nds_wide_ground_fill): where the fill was tried
 
 // Engine A as it drew the frame on screen (GPU::VisibleEndHook, at line 192): the game's VBlank handler goes on to set
 // the next frame's fade, scroll, palettes and sprites before the margins are made, which ran them a frame ahead of the
@@ -258,6 +267,7 @@ struct Store {
     u32& numOpaque;
     int screenH;     // the picture's height: a polygon reaching below it is degenerate
     bool wideKeys;   // sort keys for a picture taller than 255 rows
+    int offX, offY;  // its pixels' place on the screen: screen = picture + off
 };
 
 void storePolygon(GPU3D& g, const Store& st, Vertex* cv, int nverts, bool facingview, int polytype);
@@ -298,8 +308,54 @@ void addPolygon(GPU3D& g, Slice& s, Vertex* cv, int nverts, bool facingview, int
             vtx->HiresPosition[1] = posY & 0xFFF;
         }
     }
-    storePolygon(g, Store {s.verts[s.bank].data(), s.polys[s.bank].data(), s.numVerts, s.numPolys, s.numOpaque, H3D, false},
+    storePolygon(g, Store {s.verts[s.bank].data(), s.polys[s.bank].data(), s.numVerts, s.numPolys, s.numOpaque, H3D, false,
+        s.sx * (W3D - OVERLAP), s.sy * (H3D - OVERLAP)},
         cv, nverts, facingview, polytype);
+}
+
+// Unbound ground in the colour of the ground beside it: the edge band of the screen nearest the polygon's middle (its
+// side, its rows), flat, the material's toon / highlight mode dropped (it would look the colour up in the toon table).
+void fillGround(const Store& st, melonDS::Polygon* poly)
+{
+    s64 sx = 0, sy = 0;
+    for (u32 i = 0; i < poly->NumVertices; i++) {
+        sx += poly->Vertices[i]->FinalPosition[0];
+        sy += poly->Vertices[i]->FinalPosition[1];
+    }
+    int x = (int) (sx / poly->NumVertices) + st.offX, y = (int) (sy / poly->NumVertices) + st.offY;
+    const int side = x < W3D / 2 ? 0 : 1;
+    const int band = std::clamp(y, 0, H3D - 1) / 8;
+    u16 c = NO_FILL;
+    for (int d = 0; d < H3D / 8 && c == NO_FILL; d++) {
+        if (band - d >= 0 && wide.fill[side][band - d] != NO_FILL) c = wide.fill[side][band - d];
+        else if (band + d < H3D / 8 && wide.fill[side][band + d] != NO_FILL) c = wide.fill[side][band + d];
+    }
+    if (c == NO_FILL) return;
+    const u32 rgb[3] = {(u32) (c & 31), (u32) ((c >> 5) & 31), (u32) ((c >> 10) & 31)};
+    for (u32 i = 0; i < poly->NumVertices; i++)
+        for (int k = 0; k < 3; k++) poly->Vertices[i]->FinalColor[k] = rgb[k] ? (rgb[k] << 4) | 0xF : 0;
+    if (((poly->Attr >> 4) & 3) == 2) poly->Attr &= ~0x30u;
+}
+
+// The ground's colour (wide.fill): the colour most of the frame's pixels have, leaving out dark ones (trees' and
+// buildings' shade: a forest's would win) and water's blue (a lake's would); the frame is the field's, shown with no
+// fade. Bands of the edge columns were tried, and each side's half: beside a forest a town's ground took the trees'
+// green, beside a lake the water's blue.
+void takeFill(const uint32_t* top)
+{
+    static std::vector<u32> count(1 << 15);
+    std::fill(count.begin(), count.end(), 0);
+    u16 best = NO_FILL;
+    u32 most = 0;
+    for (int i = 0; i < W3D * H3D; i++) {
+        u32 p = top[i];
+        u32 r = (p >> 19) & 31, gr = (p >> 11) & 31, b = (p >> 3) & 31;
+        if (r + gr + b < 30 || b * 4 > (r + gr) * 3 + 16) continue;
+        u16 c = (u16) (r | gr << 5 | b << 10);
+        if (++count[c] > most) { most = count[c]; best = c; }
+    }
+    for (int side = 0; side < 2; side++) for (int band = 0; band < H3D / 8; band++) wide.fill[side][band] = best;
+    wide.fillReady = best != NO_FILL;
 }
 
 // The rest of SubmitPolygon from its screen coordinates on: the zero-dot check, the polygon's attributes, its
@@ -348,6 +404,7 @@ void storePolygon(GPU3D& g, const Store& st, Vertex* cv, int nverts, bool facing
             if (vtx->FinalColor[c]) vtx->FinalColor[c] = ((vtx->FinalColor[c] << 4) + 0xF);
         }
     }
+    if (fillNow) fillGround(st, poly);
 
     // bounds, W shift and normalisation
     u32 vtop = 0, vbot = 0;
@@ -405,6 +462,14 @@ void storePolygon(GPU3D& g, const Store& st, Vertex* cv, int nverts, bool facing
         poly->FinalZ[i] = z;
         poly->FinalW[i] = w;
     }
+    // Filled ground goes behind everything, just in front of the clear depth: where the area's real ground lies under
+    // it (Route 3's slab over Mt. Moon's rock) that shows, and only a hole through to the backdrop gets the fill. A
+    // raised one over ground further down goes with it: Route 12's untextured bridge shows its river.
+    if (fillNow) {
+        const u32 far = (g.ClearAttr2 & 0x7FFF) * 0x200 + 0x1FF - 1;
+        for (int i = 0; i < nverts; i++) poly->FinalZ[i] = (s32) far;
+        poly->Attr &= ~(1u << 15); // no fog: at that depth it would wash the fill out (Veilstone's)
+    }
 }
 
 // GPU mode: the polygon into the whole view's list. The view - L / R / T / B pixels past the screen's sides - is
@@ -459,11 +524,40 @@ void submitGpu(GPU3D& g, const Vertex* in, int nverts, bool facingview, int poly
         vtx->FinalPosition[1] = vtx->HiresPosition[1] >> 4;
     }
     storePolygon(g, Store {wide.gpuVerts[wide.gpuBank].data(), wide.gpuPolys[wide.gpuBank].data(), wide.gpuNumVerts,
-        wide.gpuNumPolys, wide.gpuNumOpaque, (int) vh, true}, cv, n, facingview, polytype);
+        wide.gpuNumPolys, wide.gpuNumOpaque, (int) vh, true, -wide.gpuL, -wide.gpuT}, cv, n, facingview, polytype);
+}
+
+// A material that wanted a texture the game didn't load: no format, no address (NNS fills them when it binds the
+// texture), its repeat / flip bits kept or not, and lit by light 0 like every map model's. Drawn untextured, a pale
+// lavender slab; the screen never shows one (HeartGold's and Platinum's ground of a map in another area, past Route 8's
+// gate to Saffron), EXPAND's margins draw it in the ground's colour (fillGround). The field's own untextured polygons
+// (Platinum's shadows) are unlit.
+inline bool unboundTexture(const GPU3D& g)
+{
+    return ((g.TexParam >> 26) & 7) == 0 && (g.TexParam & 0xFFFF) == 0 &&
+        ((g.TexParam & 0x000F0000) != 0 || (g.CurPolygonAttr & 1) != 0);
+}
+
+// Of those, the ground: a repeating material (a tile of ground), or one lit about as the last of those was (up, as
+// Platinum's untextured ground). The sides of a lamp post, a fence or a sign are lit darker: left as the game draws
+// them, else the fill (behind everything) would take them away.
+inline bool unboundGround(const GPU3D& g, const Vertex* in)
+{
+    const u32 lit = (u32) (in[0].Color[0] >> 12) | (u32) (in[0].Color[1] >> 12) << 5 | (u32) (in[0].Color[2] >> 12) << 10;
+    if (g.TexParam & 0x000F0000) {
+        wide.groundLit = lit;
+        return true;
+    }
+    if (wide.groundLit == 0xFFFFFFFF) return false;
+    auto sum = [](u32 c) { return (c & 31) + ((c >> 5) & 31) + ((c >> 10) & 31); };
+    return sum(lit) * 8 >= sum(wide.groundLit) * 7;
 }
 
 void onSubmit(GPU3D& g, const Vertex* in, int nverts, bool facingview, int polytype, void*)
 {
+    // Not in GPU mode (DS RESOLUTION): its list draws the middle too, which must stay the game's.
+    fillNow = groundFill && !wide.gpu && unboundTexture(g) && unboundGround(g, in);
+    if (fillNow && !wide.fillReady) return;
     if (wide.gpu) {
         submitGpu(g, in, nverts, facingview, polytype);
         return;
@@ -1192,6 +1286,8 @@ const WidePolygonList* pk_nds_wide_gpu_list() { return &wide.gpuList; }
 
 void pk_nds_wide_gpu_want(bool threeD) { wide.gpuWant = threeD; }
 
+void pk_nds_wide_ground_fill(bool on) { groundFill = on; }
+
 void pk_nds_wide_plan(PkNdsWidePlan* out)
 {
     *out = wide.on && (wide.gpu || wide.planOnly) ? wide.plan : PkNdsWidePlan();
@@ -1247,6 +1343,13 @@ bool pk_nds_wide_frame(NDS* nds, const uint32_t* top, bool draw, bool margins, b
     // Only while the 3D engine (engine A) is the top screen, and the caller says it's the overworld.
     bool aOnTop = (nds->PowerControl9 & (1 << 15)) != 0;
     bool threeDOnTop = margins && aOnTop;
+    // The ground's edge colours for the next frame's unbound ground: from a field frame with no fade (the master
+    // brightness's mode and factor), else kept; none off the field.
+    if (!threeDOnTop) wide.fillReady = false;
+    else if (draw) {
+        u16 mb = masterBrightnessA(nds->GPU);
+        if (!((mb >> 14) & 3) || !(mb & 31)) takeFill(top);
+    }
     // A battle: its background layer, BG3 - a text BG (mode 0-2), shown - drawn on past the screen.
     const Shown2D& unitA = shown(nds);
     bool battleBg = battle && !threeDOnTop && aOnTop && (unitA.DispCnt & 7) <= 2 && (unitA.DispCnt & (1 << 11));

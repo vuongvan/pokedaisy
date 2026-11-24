@@ -142,8 +142,10 @@ static const PkNdsFieldGame ORIGIN_HEARTGOLD = {
     0,
     // Its battle manager (0x274 bytes, made by its overlay 14's battle init, which gOverlayTemplate_Battle runs): its
     // touch screen's controller at +0x238, whose +0x10 is the input handler while the battle waits for the player (headless:
-    // 0x0220368D at the commands and the moves, 0x02203B61 at the party after a faint, 0 while the turn plays).
-    0x02255BAC, 0x238, 0x10,
+    // 0x0220368D at the commands and the moves, 0x02203B61 at the party after a faint, 0 while the turn plays). Its
+    // UI object at +0x234 runs the waiting panel's handler at +0x57C: 0x02202445 the commands, 0x02202F4D the moves
+    // (0x02202955 the bag, 0x0220270D the party; a wild and a trainer battle headless).
+    0x02255BAC, 0x238, 0x10, 0x234, 0x57C, 0x02202445, 0x02202F4D,
 };
 
 // Black (USA / Europe, IRBO rev 0): no decomp, so from headless captures (nds_dump dumps of the field, a text box, the X
@@ -739,9 +741,14 @@ static int choicePanelLeft;
 // the touch screen's.
 static int battleTouch(const PkNdsFieldGame* g, const PkNdsTouchRules* t, uint32_t (*read32)(uint32_t), uint32_t child)
 {
-    // A battle of its own (Origin HeartGold): BATTLE BUTTONS can't steer its panels, so whatever waits for a tap is the
-    // touch screen's.
-    if (g->battleManagerPtr) return managedBattleInput(g, read32) ? PK_NDS_FIELD_TOUCH : 0;
+    // A battle of its own (Origin HeartGold): its commands and moves sit where HeartGold's do, so BATTLE BUTTONS press
+    // them; anything else waiting for a tap (the party, a prompt) is the touch screen's.
+    if (g->battleManagerPtr) {
+        if (!managedBattleInput(g, read32)) return 0;
+        uint32_t panels = read32(read32(g->battleManagerPtr) + g->offBattlePanels);
+        uint32_t fn = inMainRam(panels) ? read32(panels + g->offPanelFn) : 0;
+        return fn == g->commandsFn || fn == g->movesFn ? PK_NDS_FIELD_TOUCH_BATTLE_MENU : PK_NDS_FIELD_TOUCH;
+    }
     uint32_t bs = read32(child + 0x1C);
     if (!inMainRam(bs)) return 0;
     uint32_t ctx = read32(bs + g->offBattleContext);
@@ -1268,4 +1275,124 @@ void pk_nds_field_keep_start_menu(const PkNdsFieldGame* g, uint32_t (*read32)(ui
     uint32_t task = read32(fs + g->offTask);
     if (!inMainRam(task) || read32(task + 4) != t->startMenuTask) return;
     if (read32(fs + t->offMenuInputState) != 0) write32(fs + t->offMenuInputState, 0);
+}
+
+// EXPAND's margins in HeartGold / SoulSilver and Platinum. The field keeps the 4 map chunks round the player loaded and draws every
+// one's props (lamps, signs, buildings: map_prop_manager.c's ov01_021F3A3C) from the *current* area's models
+// (AreaDataManager, loaded per map header's areaDataBank). A chunk of another area - Saffron seen from Route 8, the gate
+// between them - had each prop whose model this area didn't load turned into model 0 (MapPropManager_LoadFromNARC), a
+// red and purple box. The screen never reaches those (the gate house itself, a model both areas load, is drawn right),
+// but EXPAND's wider box test lets the game draw them (a player's report). So for the frame, the model-0 props of a chunk
+// in another area are marked culled, as the game marks a prop it hides (MapProp.culled), and put back after it.
+// FieldSystem: location 0x20, mapLoadManager 0x2C, mapMatrix 0x30 (field_system.h). MapLoadManager: the 4 loaded maps'
+// pointers at 0x90, each with its matrix cell at 0x860 (-1 = none) and its MapPropManager at 0x868
+// (MapLoadManager_RenderLoadedMaps, ov01_021F630C); MapPropManager: 32 MapProps of 0x38 bytes, buildModel at 0, active
+// at 4, culled at 8. MapMatrix: matrix_id u8 at 2, the cells' map headers (u16) at 6. sMapHeaders: 24-byte MapHeaders,
+// areaDataBank at +1, matrixId at +4 - found once by its first three entries (EVERYWHERE and NOTHING: area 0, move models
+// 15, one matrix; UNION: area 26; German HeartGold's at 0x020F6B94) and checked against the current map's matrix every
+// frame. Platinum is the same with its own offsets (PLATINUM_PROPS; MapPropManager_Load sets modelID 0, MapProp.hidden
+// skips one in MapPropManager_Render). (The ground's materials whose textures this area lacks are pk_nds_wide.cpp's
+// unboundTexture.)
+namespace {
+constexpr int MAX_HIDDEN = 4 * 32;
+struct ForeignProps {
+    const PkNdsFieldGame* game = nullptr;
+    uint32_t headers = 0;         // sMapHeaders, 0 = not found
+    bool searched = false;
+    uint32_t hidden[MAX_HIDDEN];  // the culled words set this frame
+    int numHidden = 0;
+};
+ForeignProps foreign;
+
+// One game's structures for it (see above; Platinum's from pret/pokeplatinum: field_system.h, land_data.c, map_prop.h,
+// map_header.h).
+struct PropLayout {
+    int offLoadManager, offMatrix;   // FieldSystem's MapLoadManager (Platinum: LandDataManager) and MapMatrix
+    int offLoadedMaps;               // ... its 4 LoadedMap pointers
+    int propStride;                  // MapProp: model id at 0, loaded / active at 4, hidden / culled at 8
+    int headerArea, headerMatrix;    // MapHeader: the area data's byte, the matrix id's (a u8 / the low byte of a u16)
+};
+// HeartGold / SoulSilver
+constexpr PropLayout HGSS_PROPS = {0x2C, 0x30, 0x90, 0x38, 1, 4};
+// Platinum: FieldSystem.landDataMan 0x28, .mapMatrix 0x2C; LandDataManager.loadedMaps 0x88 (after loadedMapBufs, two
+// MapLazyLoaderManagers of 0x2C, the pending loads' 0x1C and the 4 cancel flags); MapProp 0x8C (an NNSG3dRenderObj, the
+// model, position / rotation / scale after the 4 words); MapHeader.areaDataArchiveID at 0, mapMatrixID at 2.
+constexpr PropLayout PLATINUM_PROPS = {0x28, 0x2C, 0x88, 0x8C, 0, 2};
+
+uint32_t findMapHeaders(uint32_t (*read32)(uint32_t), bool platinum)
+{
+    auto byte = [&](uint32_t a) { return (read32(a & ~3u) >> ((a & 3) * 8)) & 0xFF; };
+    auto half = [&](uint32_t a) { return (read32(a & ~3u) >> ((a & 2) * 8)) & 0xFFFF; };
+    for (uint32_t a = 0x02000000u; a < 0x02180000u; a += 4) {
+        uint32_t w0 = read32(a);
+        if (platinum) {
+            // EVERYWHERE, NOTHING (area 0), UNDERGROUND (2), JUBILIFE_CITY (6, the main matrix), its MART (22)
+            if ((w0 & 0xFFFF00FF) != 0 || byte(a + 24) != 0 || byte(a + 48) != 2 || byte(a + 72) != 6 ||
+                half(a + 74) != 0 || byte(a + 96) != 22 || half(a + 98) == 0)
+                continue;
+            return a;
+        }
+        // entry 0: area 0, move model bank 15 (the u16 after it, low 4 bits)
+        if (((w0 >> 8) & 0xFF) != 0 || ((w0 >> 16) & 0xF) != 15) continue;
+        if (byte(a + 25) != 0 || (half(a + 26) & 0xF) != 15 || half(a + 28) != half(a + 4)) continue;
+        if (byte(a + 49) != 26) continue;
+        return a;
+    }
+    return 0;
+}
+} // namespace
+
+void pk_nds_field_foreign_props(const PkNdsFieldGame* g, uint32_t (*read32)(uint32_t), void (*write32)(uint32_t, uint32_t),
+                                int hide)
+{
+    if (!hide) {
+        // Put back only what is still that prop (model 0, in use, hidden by us): a frame that freed the chunk and gave its
+        // block to something else must not get a word zeroed.
+        for (int i = 0; i < foreign.numHidden; i++) {
+            uint32_t p = foreign.hidden[i];
+            if (read32(p) == 0 && read32(p + 4) && read32(p + 8) == 1) write32(p + 8, 0);
+        }
+        foreign.numHidden = 0;
+        return;
+    }
+    if (!g || !write32 || g->gen != 0) return;  // Gen 4's field: HeartGold / SoulSilver, Platinum
+    const bool platinum = !g->rateBytes;
+    const PropLayout& L = platinum ? PLATINUM_PROPS : HGSS_PROPS;
+    if (foreign.game != g) {
+        foreign = ForeignProps();
+        foreign.game = g;
+    }
+    uint32_t fs = read32(g->fieldSystemPtr);
+    if (!inMainRam(fs)) return;
+    uint32_t loc = read32(fs + g->offLocation), mlm = read32(fs + L.offLoadManager), mm = read32(fs + L.offMatrix);
+    if (!inMainRam(loc) || !inMainRam(mlm) || !inMainRam(mm)) return;
+    if (!foreign.searched) {
+        foreign.searched = true;
+        foreign.headers = findMapHeaders(read32, platinum);
+    }
+    if (!foreign.headers) return;
+    auto byte = [&](uint32_t a) { return (read32(a & ~3u) >> ((a & 3) * 8)) & 0xFF; };
+    uint32_t mapId = read32(loc);
+    if (mapId > 2000) return;
+    uint32_t here = foreign.headers + mapId * 24;
+    if (byte(here + L.headerMatrix) != ((read32(mm) >> 16) & 0xFF)) return;  // not this map's matrix
+    uint32_t area = byte(here + L.headerArea);
+    uint32_t cells = (read32(mm) & 0xFF) * ((read32(mm) >> 8) & 0xFF);
+    for (int i = 0; i < 4; i++) {
+        uint32_t lm = read32(mlm + L.offLoadedMaps + i * 4);
+        if (!inMainRam(lm)) continue;
+        uint32_t cell = read32(lm + 0x860), pm = read32(lm + 0x868);
+        if (cell >= cells || !inMainRam(pm)) continue;
+        uint32_t h = mm + 6 + cell * 2;
+        uint32_t header = (read32(h & ~3u) >> ((h & 2) * 8)) & 0xFFFF;
+        if (header == 0 || header > 2000) continue;  // no map there (MAP_EVERYWHERE)
+        if (byte(foreign.headers + header * 24 + L.headerArea) == area) continue;
+        for (int j = 0; j < 32 && foreign.numHidden < MAX_HIDDEN; j++) {
+            uint32_t p = pm + j * L.propStride;
+            if (read32(p) == 0 && read32(p + 4) && read32(p + 8) == 0) {
+                write32(p + 8, 1);
+                foreign.hidden[foreign.numHidden++] = p;
+            }
+        }
+    }
 }

@@ -64,7 +64,7 @@ Achievement news pops up at the top of the companion, over whatever tab you're o
 - `ACHIEVEMENT UNLOCKED`, with its badge and points, and the level-up fanfare from the games plays.
 - `GAME COMPLETE` when you've unlocked every achievement in the set.
 - How many you've unlocked so far, when a game starts.
-- `PROGRESS` when you get closer to one that counts something.
+- `PROGRESS` when you get further than before on one that counts something (a count that drops and comes back says nothing new).
 - `LEADERBOARD` when a leaderboard attempt starts or ends.
 - Connection notices, when the site can't be reached.
 

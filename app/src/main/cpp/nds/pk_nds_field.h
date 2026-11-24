@@ -61,6 +61,14 @@ typedef struct PkNdsFieldGame {
     uint32_t battleManagerPtr;
     int offBattleUi;
     int offUiHandler;
+    // Which panel waits: the manager's UI object at offBattlePanels runs the panel's handler at offPanelFn, which is
+    // commandsFn at the commands and movesFn at the moves. Not its id: on the way back to the commands the id still says
+    // the moves (or the party) for a few frames while the commands' handler already runs. Gen4Reader.kt's
+    // readManagedBattleInput reads the same.
+    int offBattlePanels;
+    int offPanelFn;
+    uint32_t commandsFn;
+    uint32_t movesFn;
 } PkNdsFieldGame;
 
 // pk_wide.h's PK_FIELD_* bits, which the engine already reads, plus two the DS sets:
@@ -188,6 +196,13 @@ int pk_nds_field_state(const PkNdsFieldGame* game, uint32_t (*read32)(uint32_t a
 /** DS LAYOUT on one screen: the X menu comes back after a menu screen left by touch too (pk_nds_field.cpp). Call on the
  * screen's closing fade. */
 void pk_nds_field_keep_start_menu(const PkNdsFieldGame* g, uint32_t (*read32)(uint32_t), void (*write32)(uint32_t, uint32_t));
+
+/** EXPAND in HeartGold / SoulSilver and Platinum: before a frame ([hide] 1), the props of a loaded map chunk in another
+ * area than the player's that the game made model 0 (their model isn't this area's: a box only EXPAND's margins show)
+ * are marked culled (Platinum: hidden); after it ([hide] 0), they are put back, so a state between frames never keeps
+ * them. */
+void pk_nds_field_foreign_props(const PkNdsFieldGame* g, uint32_t (*read32)(uint32_t), void (*write32)(uint32_t, uint32_t),
+                                int hide);
 
 #ifdef __cplusplus
 }

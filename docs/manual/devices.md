@@ -3,7 +3,7 @@ title: Screens and devices
 summary: How PokeDaisy uses two screens, one screen, a phone held upright or a folding phone, and the settings that move the game and companion around.
 section: start
 order: 3
-keywords: [nds, nintendo ds, touch screen, stylus, platinum, heartgold, soulsilver, dual screen, two screens, thor, ayn, retroid, duo, anbernic, rg ds, single screen, pocket 6, phone, portrait, landscape, rotate, rotation, tablet, side panel, window, modal, popup, loading, slow loading, companion view, display, bottom screen, top screen, foldable, folding phone, fold, flip, galaxy z fold, pixel fold, hinge, tabletop, flex mode, book, half open]
+keywords: [nds, nintendo ds, touch screen, stylus, platinum, heartgold, soulsilver, dual screen, two screens, thor, ayn, retroid, duo, anbernic, rg ds, ayaneo, pocket ds, single screen, pocket 6, phone, portrait, landscape, rotate, rotation, tablet, side panel, window, modal, popup, loading, slow loading, companion view, display, bottom screen, top screen, foldable, folding phone, fold, flip, galaxy z fold, pixel fold, hinge, tabletop, flex mode, book, half open]
 ---
 
 PokeDaisy works with two screens or one. With two, the game is on top and the companion below. With one, the companion slides in beside the game, and on a phone held upright it sits under it. This page covers each setup and the settings that go with it.
@@ -14,8 +14,9 @@ PokeDaisy works with two screens or one. With two, the game is on top and the co
 | --- | --- |
 | AYN Thor | What PokeDaisy was made on. The companion is laid out for its bottom screen. |
 | Retroid Pocket Duo Lite | Its bottom screen is squarer (4:3), so a few screens rearrange to fit: the Pokémon summary puts its types beside the icon, and `STATES` uses flatter screenshots. |
-| Retroid Pocket Duo | Should work the same way; not yet tried on real hardware. |
-| Anbernic RG DS | Should work with `SWAP SCREENS` on (see below); not yet tried on real hardware. Its screens are small (640 by 480), so the companion's text is a size smaller there, and a few screens squeeze: a move's power and PP sit beside its name, and `DEX` puts height and weight on two lines. |
+| Retroid Pocket Duo | Works the same way. |
+| AYANEO Pocket DS | Works since v1.5.0. When a game starts, PokeDaisy opens an empty window on the bottom screen so AYANEO's own panel steps aside for the companion (see `SINGLE SCREEN` below). |
+| Anbernic RG DS | Works with `SWAP SCREENS` on (see below). Its screens are small (640 by 480), so the companion's text is a size smaller there, and a few screens squeeze: a move's power and PP sit beside its name, and `DEX` puts height and weight on two lines. Its chip is slow for DS games: `DS CORE` on `AUTO` picks the lighter `DSPERATE` engine there, and `LIGHT COMPANION` keeps your buttons quick. |
 
 The game always opens on the device's main display, with the companion on the other one, even if you start it from the bottom screen.
 
@@ -92,7 +93,7 @@ HeartGold and SoulSilver (the USA releases), Platinum, Black, White, Black 2 and
 
 In the German HeartGold and SoulSilver, `ONE SCREEN` keeps the touch screen small in the corner, as `PICTURE IN PICTURE` does, so it's always there.
 
-In Origin HeartGold, `ONE SCREEN` floats the touch screen in for its X menu, its options and its battles: its battle system is its own, so its battle buttons aren't on the top screen. Whenever a battle waits for you (your moves, your party), its touch screen floats in and you tap the game's own buttons on it. While the battle plays, the game fills the screen again. The companion's `BATTLE` tab still shows the matchups.
+In Origin HeartGold, `ONE SCREEN` floats the touch screen in for its X menu and its options. Its battles get the battle buttons as HeartGold's do (see [Battle](battle.md#on-one-screen-battle-buttons)), and its party and its other questions in a battle float in for you to tap. `POKéMON` opens the game's own party there: you pick who to send out on it yourself. The companion's `BATTLE` tab still shows the matchups.
 
 ## Single-screen handhelds
 

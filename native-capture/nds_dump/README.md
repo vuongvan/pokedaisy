@@ -56,6 +56,7 @@ X Y`, joined with commas (`A,UP`), or `NONE`.
 | `wide MX [MY]` | EXPAND with MX DS pixels left and right, MY above and below (0 = off). |
 | `look DX DY` | From here on the window moves DX, DY DS pixels a frame before each frame, as the look-around moves it (`look 0 0` leaves it where it is); `ffmode` records that window. |
 | `wideshot FILE`, `wideshots PREFIX EVERY COUNT` | The last wide frame(s) as PNG. |
+| `foreignprops 1/0` | HeartGold / SoulSilver and Platinum under `wide`: a loaded map chunk of another area keeps its props hidden for each frame, as the app does (`pk_nds_field_foreign_props`; 1, the default) or draws them as the game would (0). |
 | `widecheck [N]` | N frames, each checked where the slices overlap the game's own frame (must be 0 differing). |
 | `widecount` | Polygons in each slice this frame. |
 | `bgdump BG FILE` | Engine A's text BG whole, as the hardware reads it (clear = magenta). |

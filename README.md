@@ -122,18 +122,21 @@ Everything is explained in the [manual](https://pokedaisy.com/docs/).
 
 ## Devices
 
-| Device                     | Status                                                         |
-| -------------------------- | -------------------------------------------------------------- |
-| AYN Thor                   | Tested, made for it                                            |
-| Retroid Pocket Duo Lite    | Supported, with its own 4:3 layout                             |
-| Retroid Pocket Duo         | Should work, not yet tested on real hardware                   |
-| Anbernic RG DS             | Should work, not yet tested on real hardware                   |
-| Retroid Pocket 6           | Single screen: tested                                          |
-| Other one-screen handhelds | Should work, held sideways like the Pocket 6                   |
-| Android phones (portrait)  | Should work, checked in screenshots only                       |
-| A phone cast to a TV       | Should work: the game on the TV, the companion on the phone    |
+| Device                     | Status                                                              |
+| -------------------------- | ------------------------------------------------------------------- |
+| AYN Thor                   | Tested, made for it                                                 |
+| Retroid Pocket Duo Lite    | Supported, with its own 4:3 layout                                  |
+| Retroid Pocket Duo         | Works, played on by players                                         |
+| AYANEO Pocket DS           | Works since v1.5.0, checked by players                              |
+| Anbernic RG DS             | Works with SWAP SCREENS on; DS games are heavy for its chip         |
+| Retroid Pocket 6           | Single screen: tested                                               |
+| Other one-screen handhelds | Work held sideways like the Pocket 6 (players use the Retroid Pocket 5 and AYN Odin 2 / 3) |
+| Android phones             | Tested on a Samsung Galaxy S9, upright or sideways                  |
+| Tablets                    | Tested on a Samsung Galaxy Tab A                                    |
+| Folding phones             | Should work with FOLD LAYOUT, not yet tried by us                   |
+| A phone cast to a TV       | Should work: the game on the TV, the companion on the phone         |
 
-Any Android 8.0+ device runs the games.
+Any Android 8.0+ device runs the games. PokeDaisy also runs on Linux (Steam Deck and Linux handhelds), Windows and the Nintendo 3DS: see below.
 
 ## Download and install
 
@@ -295,8 +298,8 @@ For a version that isn't listed, the app tries to read it as a game it knows (BE
 when it isn't sure. Map ◐ means place names only,
 without the map picture. Guide ◐ means the live pages only (the wild encounters here and the next boss). Battle ◐
 means the battle panes work but haven't been checked in every kind of battle. On the DS, HeartGold's and SoulSilver's
-battles aren't read yet. Origin HeartGold's battle system is its own: the battle panes read it, but their buttons
-can't press its menus, and it has no guide yet. Heartfelt Gold reads as HeartGold with its own species, moves, items and type chart, and has no guide yet. Sacred Gold and Storm Silver read as HeartGold and SoulSilver with their own species' types and moves, and no guide yet. Renegade Platinum reads as Platinum with its own types (Fairy among them),
+battles aren't read yet. Origin HeartGold's battle system is its own: the battle panes read it and the battle buttons
+press its commands and moves, but POKéMON opens the game's own party (no switch), and it has no guide yet. Heartfelt Gold reads as HeartGold with its own species, moves, items and type chart, and has no guide yet. Sacred Gold and Storm Silver read as HeartGold and SoulSilver with their own species' types and moves, and no guide yet. Renegade Platinum reads as Platinum with its own types (Fairy among them),
 moves and type chart; its trainers and wild Pokémon are its own, so it has no guide yet. Blaze Black 2 Redux and Volt White 2 Redux read the same way, as Black 2 and White 2 with their own types, moves, type chart and machines, and no guide yet. Team Rocket Dragonsden is DragonsdenTV's Team Rocket Edition, not FireRed Rocket Edition.
 FireRed (rev 0 and 1) and Emerald randomized with Universal Pokemon Randomizer ZX 4.6.1 work with any settings and
 seed: the companion reads the randomized types, moves, teams, wild Pokémon and items from the ROM, and the guide leaves

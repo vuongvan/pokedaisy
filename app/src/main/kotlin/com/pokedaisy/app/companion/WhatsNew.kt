@@ -38,7 +38,7 @@ object WhatsNew {
     /** Newest first. */
     val RELEASES: List<Notes> by lazy {
         listOf(
-            NOTES_1_6_2,
+            hotfix("1.6.2.1", NOTES_1_6_2, "1.6.2.1 HOTFIX: games open again on the Anbernic RG Rotate instead of closing at once."),
             NOTES_1_6_1,
             NOTES_1_6_0,
             hotfix("1.5.0.1", NOTES_1_5_0, "1.5.0.1 HOTFIX: turning a Samsung Galaxy sideways no longer closes the game."),
@@ -52,7 +52,7 @@ object WhatsNew {
                 NEW,
                 listOf(
                     "New games: Clover, Elysium, Sacred Gold and Storm Silver, Oops All Eevees!, Rhythm, Ceruleum, RecordKeepers, Red and Yellow with Gen II Graphics, Italian Unbound, and the German Platinum.",
-                    "New look: the menus in the games' own summary colours, a move page, and FONT to pick the app's letters.",
+                    "New look: the menus in the games' summary style in PokeDaisy's blue, a move page, and FONT to pick the app's letters.",
                     "POKéMON PICTURES: each Pokémon's own picture on PARTY, in the summary, in battle and on the HUD.",
                     "Summary: drag a Pokémon's moves into a new order, and see an egg's types and stats before it hatches.",
                     "ITEM POPUPS and MOVE ADVICE: a card when you pick up an item, and advice on which move to forget.",

@@ -617,7 +617,14 @@ void pk_ndsb_run_frame(void)
     u32 t = touch.load();
     if (t & 0x80000000u) nds->TouchScreen((u16) ((t >> 8) & 0xFF), (u16) (t & 0xFF));
     else nds->ReleaseScreen();
+    // EXPAND: another area's map chunk keeps its props to itself for the frame (pk_nds_field_foreign_props)
+    // Only from the field (the last frame's read): a battle or a menu app may have freed the map chunks.
+    if (ds->wide && (ds->fieldBits & PK_NDS_FIELD_SCREEN) && !(ds->fieldBits & (PK_NDS_FIELD_MENU | PK_NDS_FIELD_BATTLE)))
+        pk_nds_field_foreign_props(ds->field, mainRead32, mainWrite32, 1);
+    // ...and the margins' ground fill (pk_nds_wide.cpp), tried on HeartGold / SoulSilver and Platinum only.
+    pk_nds_wide_ground_fill(ds->field && ds->field->gen == 0);
     nds->RunFrame();
+    pk_nds_field_foreign_props(ds->field, mainRead32, mainWrite32, 0);
     // Every frame is drawn (BananaDS's melonDS has no draw skip); a frame fast-forward won't show isn't copied out.
     ds->drawn = show;
     ds->presented = false;

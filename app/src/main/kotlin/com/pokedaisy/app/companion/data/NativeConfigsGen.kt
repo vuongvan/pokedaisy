@@ -102,6 +102,9 @@ val NATIVE_FIRERED_REV1 = NATIVE_FIRERED_REV0.copy(
 // uses that move (THUNDER WAVE from cell 1).
 val NATIVE_FIRERED_REV0_RETAIL = NATIVE_FIRERED_REV0.copy(
     trainerCard = TRAINER_CARD_FIRERED,
+    // DEX, GUIDE's HERE / NEXT BOSS, the HUD's WILD and REPEL STEPS (the save's vars come with the guide tables).
+    pokedex = POKEDEX_FIRERED_REV0,
+    guideTables = GUIDE_TABLES_FIRERED_REV0,
     actionCursor = 0x02023FF8L,
     moveCursor = 0x02023FFCL,
 )

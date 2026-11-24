@@ -89,6 +89,9 @@ const melonDS::WidePolygonList* pk_nds_wide_gpu_list();
  * built. */
 void pk_nds_wide_gpu_want(bool threeD);
 
+/** EXPAND's margins draw another area's untextured ground in the field's colour (HeartGold / SoulSilver, Platinum). */
+void pk_nds_wide_ground_fill(bool on);
+
 /** A margin pixel's plan, the word's top byte: PLAN_COLOR = its colour as is (RGB in the low bytes); PLAN_3D / PLAN_3D_OVER
  * = the 3D there, put on the screen as the 2D engine would (alone, or under the 2D colour in the low bytes - 6 bits a
  * channel - blended by BLDCNT); PLAN_SCREEN = the screen's own pixel at (low byte | bit 16's 256, byte 1); PLAN_3D_ON =

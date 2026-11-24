@@ -102,9 +102,42 @@ class KeyColors(
     val pressed: Boolean = false,
 )
 
+/** The blues of [retroStylePalette]: what a THEME's hue moves. */
+internal val RETRO_FAMILY = 195f..250f
+
+private val themedPalettes = HashMap<List<Any?>, UiStylePalette?>()
+
+/**
+ * [style]'s palette in a THEME's [hue] (null: POKéDAISY, the default, the blues as they are): the whole style moved to the
+ * theme's colour, not only its greys. Cached: OptionColors asks on every colour.
+ */
+fun themedStylePalette(style: UiStyle, dark: Boolean, hue: Float?): UiStylePalette? =
+    themedPalettes.getOrPut(listOf(style, dark, hue)) {
+        val base = uiStylePalette(style, dark)
+        if (base == null || hue == null || style != UiStyle.SUMMARY_MINT) base else base.rehued(RETRO_FAMILY, hue)
+    }
+
+private fun UiStylePalette.rehued(from: ClosedFloatingPointRange<Float>, to: Float, calmed: Boolean = true): UiStylePalette {
+    fun Color.r() = rehued(from, to, calmed)
+    fun KeyColors.r() = KeyColors(outline.r(), face.r(), low.r(), depth.r(), text.r(), shadow.r(), shine?.r(), pressed)
+    fun CellColors.r() = CellColors(line.r(), a.r(), b.r(), head.r(), headText.r(), headShadow.r())
+    return UiStylePalette(
+        titleFill.r(), titleText.r(), titleShadow.r(), titleLayers.map { (c, w) -> c.r() to w },
+        listFill.r(), listLayers.map { (c, w) -> c.r() to w }, stripe?.r(), rule?.r(), selected.r(), label.r(), labelShadow.r(),
+        sectionFill.r(), sectionText.r(), sectionShadow.r(), arrow?.r(), separatorDark.r(), separatorLight.r(), well.r(),
+        button?.r(), tab?.r(), tabOpen?.r(), foeFill, foeShadow, cells?.r(), foeCells,
+    )
+}
+
 fun uiStylePalette(style: UiStyle, dark: Boolean): UiStylePalette? = when (style) {
     UiStyle.CLASSIC -> null
-    UiStyle.SUMMARY_MINT -> if (!dark) UiStylePalette(
+    // PokeDaisy's blues since 1.6.2 beta 3 (the user's call: the teal it was sampled in read as green).
+    UiStyle.SUMMARY_MINT -> retroStylePalette(dark)
+}
+
+/** SUMMARY MINT in the teal it was sampled in (Emerald's summary pages), kept for reference: [retroStylePalette] is worn. */
+@Suppress("unused")
+fun summaryMintTealPalette(dark: Boolean): UiStylePalette = if (!dark) UiStylePalette(
         titleFill = Color(0xFF318C73), titleText = Color(0xFFFFFFFF), titleShadow = Color(0xFF006B63),
         titleLayers = listOf(Color(0xFF00524A) to 1, Color(0xFF9CDEA5) to 1),
         listFill = Color(0xFFF7FFFF),
@@ -167,7 +200,75 @@ fun uiStylePalette(style: UiStyle, dark: Boolean): UiStylePalette? = when (style
             head = Color(0xFF7E3A4C), headText = Color(0xFFFFFFFF), headShadow = Color(0xFF2A0E16),
         ),
     )
-}
+
+/**
+ * SUMMARY MINT's build (a framed header joined to a framed list, section bands, keys, cells) in PokeDaisy's blues
+ * (#3D6FE0, the brand's; the user's call, 2026-11-22: the POKéDAISY theme's look instead of Emerald's teal), the list's
+ * frame band 2 GBA pixels. [summaryMintTealPalette] keeps the teal it was sampled in.
+ */
+fun retroStylePalette(dark: Boolean): UiStylePalette = if (!dark) UiStylePalette(
+    titleFill = Color(0xFF3D6FE0), titleText = Color(0xFFFFFFFF), titleShadow = Color(0xFF2449B0),
+    titleLayers = listOf(Color(0xFF1A3A90) to 1, Color(0xFF9DB8FF) to 1),
+    listFill = Color(0xFFFFFFFF),
+    listLayers = listOf(Color(0xFF2449B0) to 1, Color(0xFFA9C1F5) to 2, Color(0xFF5A86EA) to 1),
+    stripe = Color(0xFFF2F6FD), rule = null, selected = Color(0xFFE5EDFF),
+    label = Color(0xFF232B40), labelShadow = Color(0xFFD5DCEA),
+    sectionFill = Color(0xFF5A86EA), sectionText = Color(0xFFFFFFFF), sectionShadow = Color(0xFF2449B0),
+    arrow = Color(0xFF232B40),
+    separatorDark = Color(0xFFA9C1F5), separatorLight = Color(0xFFFFFFFF), well = Color(0xFFEEF3FC),
+    button = KeyColors(
+        outline = Color(0xFF1A3A90), face = Color(0xFFFFFFFF), low = Color(0xFFE5EDFF), depth = Color(0xFF5A86EA),
+        text = Color(0xFF232B40), shadow = Color(0xFFD5DCEA), shine = null,
+    ),
+    tab = KeyColors(
+        outline = Color(0xFF1A3A90), face = Color(0xFFC9D8FA), low = Color(0xFFA9C1F5), depth = Color(0xFF3D6FE0),
+        text = Color(0xFF1A2F6A), shadow = Color(0xFFE8EFFD), shine = Color(0xFFEEF3FF),
+    ),
+    tabOpen = KeyColors(
+        outline = Color(0xFF1A3A90), face = Color(0xFF4C7BE6), low = Color(0xFF3D6FE0), depth = Color(0xFF1A3A90),
+        text = Color(0xFFFFFFFF), shadow = Color(0xFF1A3A90), shine = Color(0xFF8AA8F2), pressed = true,
+    ),
+    foeFill = Color(0xFFC86478), foeShadow = Color(0xFF7A2E40),
+    cells = CellColors(
+        line = Color(0xFF9DB4EC), a = Color(0xFFFFFFFF), b = Color(0xFFEAF0FD),
+        head = Color(0xFF4C7BE6), headText = Color(0xFFFFFFFF), headShadow = Color(0xFF1A3A90),
+    ),
+    foeCells = CellColors(
+        line = Color(0xFFC98494), a = Color(0xFFFFF7F8), b = Color(0xFFF9E3E8),
+        head = Color(0xFFC05A70), headText = Color(0xFFFFFFFF), headShadow = Color(0xFF6A2234),
+    ),
+) else UiStylePalette(
+    titleFill = Color(0xFF3560D0), titleText = Color(0xFFFFFFFF), titleShadow = Color(0xFF0E1A40),
+    titleLayers = listOf(Color(0xFF050A18) to 1, Color(0xFF5A7FD8) to 1),
+    listFill = Color(0xFF1C2333),
+    listLayers = listOf(Color(0xFF05070D) to 1, Color(0xFF2E4A8A) to 2, Color(0xFF233A6A) to 1),
+    stripe = Color(0xFF20283A), rule = null, selected = Color(0xFF2B3A62),
+    label = Color(0xFFE8ECF5), labelShadow = Color(0xFF2A3348),
+    sectionFill = Color(0xFF2F55B8), sectionText = Color(0xFFFFFFFF), sectionShadow = Color(0xFF0E1A40),
+    arrow = Color(0xFFE8ECF5),
+    separatorDark = Color(0xFF05070D), separatorLight = Color(0xFF2E374C), well = Color(0xFF232B3E),
+    button = KeyColors(
+        outline = Color(0xFF05070D), face = Color(0xFF2E3850), low = Color(0xFF262F44), depth = Color(0xFF151B28),
+        text = Color(0xFFE8ECF5), shadow = Color(0xFF141A26), shine = Color(0xFF3E4A66),
+    ),
+    tab = KeyColors(
+        outline = Color(0xFF05070D), face = Color(0xFF283147), low = Color(0xFF222A3D), depth = Color(0xFF151B28),
+        text = Color(0xFFB8C2D8), shadow = Color(0xFF10141E), shine = Color(0xFF364260),
+    ),
+    tabOpen = KeyColors(
+        outline = Color(0xFF05070D), face = Color(0xFF4A70D8), low = Color(0xFF3560D0), depth = Color(0xFF1A3A90),
+        text = Color(0xFFFFFFFF), shadow = Color(0xFF0E1A40), shine = Color(0xFF6A8CE8), pressed = true,
+    ),
+    foeFill = Color(0xFF8A3E50), foeShadow = Color(0xFF3A141E),
+    cells = CellColors(
+        line = Color(0xFF2E4A8A), a = Color(0xFF1C2333), b = Color(0xFF212A3C),
+        head = Color(0xFF2F55B8), headText = Color(0xFFFFFFFF), headShadow = Color(0xFF0E1A40),
+    ),
+    foeCells = CellColors(
+        line = Color(0xFF7A3A4A), a = Color(0xFF2A1E22), b = Color(0xFF34252A),
+        head = Color(0xFF7E3A4C), headText = Color(0xFFFFFFFF), headShadow = Color(0xFF2A0E16),
+    ),
+)
 
 /**
  * SUMMARY MINT's build in Unbound's colours (the user's call: Unbound purple with gold touches), sampled headless from its

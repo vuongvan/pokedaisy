@@ -24,6 +24,19 @@ class StateFilesTest {
         assertFalse((files.directory / "ss0.tmp").isFile)
     }
 
+    /** 1.6.2's launch crash: a states folder that can't be made (here, under a file) must not throw, as File.mkdirs
+     * never did; the game opens and only its state writes fail. */
+    @Test fun aFolderThatCantBeMadeDoesNotThrow() {
+        val blocker = root / "not-a-folder"
+        blocker.writeText("x")
+        assertFalse((blocker / "states").mkdirs())
+        val unwritable = StateFiles(blocker / "states" / "1234abcd")
+        assertFalse(unwritable.exists(0))
+        assertFalse(unwritable.saveSlot(0, { it.writeText("state"); true }))
+        assertTrue((root / "fine" / "deep").mkdirs())
+        assertTrue((root / "fine" / "deep").mkdirs())
+    }
+
     @Test fun deleteRemovesTheEntireSlotAndAbsentPicturesDoNotStayStale() {
         assertTrue(save(2, "old"))
         assertTrue(files.saveSlot(2, { it.writeText("new"); true }))

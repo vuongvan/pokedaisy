@@ -324,6 +324,9 @@ void pk_ndsm_touch(bool down, int x, int y)
     touch.store((down ? 0x80000000u : 0u) | (cx << 8) | cy);
 }
 
+static uint32_t mainRead32(uint32_t addr);
+static void mainWrite32(uint32_t addr, uint32_t v);
+
 void pk_ndsm_run_frame(void)
 {
     if (!ds) return;
@@ -350,7 +353,14 @@ void pk_ndsm_run_frame(void)
     ds->drawn = draw;
     nds->GPU.SkipDraw = !draw;
     nds->GPU.SkipDrawNext = !drawNext;
+    // EXPAND: another area's map chunk keeps its props to itself for the frame (pk_nds_field_foreign_props)
+    // Only from the field (the last frame's read): a battle or a menu app may have freed the map chunks.
+    if (ds->wide && (ds->fieldBits & PK_NDS_FIELD_SCREEN) && !(ds->fieldBits & (PK_NDS_FIELD_MENU | PK_NDS_FIELD_BATTLE)))
+        pk_nds_field_foreign_props(ds->field, mainRead32, mainWrite32, 1);
+    // ...and the margins' ground fill (pk_nds_wide.cpp), tried on HeartGold / SoulSilver and Platinum only.
+    pk_nds_wide_ground_fill(ds->field && ds->field->gen == 0);
     nds->RunFrame();
+    pk_nds_field_foreign_props(ds->field, mainRead32, mainWrite32, 0);
     int fb = nds->GPU.FrontBuffer;
     // GPU mode: the framebuffers hold the 2D lines for the compositor; the screens come from it (below).
     if (draw && !gpu) {

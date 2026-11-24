@@ -20,7 +20,7 @@ export const PLATFORMS = [
     id: 'linux', name: 'LINUX', icon: 'tux', guide: '/docs/linux-install/', localGuide: true,
     text: msg('Steam Deck, Linux PCs and Linux handhelds, or the cores alone for RetroArch.'),
     files: [
-      { match: 'pokedaisy-linux-x86_64.zip', icon: 'pc', label: msg('Steam Deck and Linux PCs') },
+      { match: 'pokedaisy-linux-x86_64.zip', icon: 'desktop', label: msg('Steam Deck and Linux PCs') },
       { match: 'pokedaisy-linux-aarch64.zip', icon: 'handheld', label: msg('TrimUI handhelds (CrossMix, NextUI)') },
       { match: 'pokedaisy-portmaster-aarch64.zip', icon: 'handheld', label: msg('PortMaster handhelds (ROCKNIX, Knulli, muOS)') },
       { match: 'PokeDaisy-NXRedux.zip', icon: 'handheld', label: msg('TrimUI Brick on NXRedux') },
@@ -40,7 +40,7 @@ export const PLATFORMS = [
     id: 'windows', name: 'WINDOWS', icon: 'windows', guide: '/docs/windows-install/',
     text: msg('Windows 10 or 11, on a 64-bit PC.'),
     files: [
-      { match: (n) => /^PokeDaisy-.+-windows-x86_64\.zip$/.test(n), icon: 'pc', label: msg('Windows PCs') },
+      { match: (n) => /^PokeDaisy-.+-windows-x86_64\.zip$/.test(n), icon: 'desktop', label: msg('Windows PCs') },
     ],
   },
   { id: 'ios', name: 'IOS', icon: 'iphone', soon: true, files: [] },

@@ -214,6 +214,207 @@ index 0000000..eb2b682
 +        file(context).delete()
 +    }
 +}
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/LinkActivity.kt b/app/src/main/kotlin/com/pokedaisy/app/LinkActivity.kt
+index 9094139..b3780a7 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/LinkActivity.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/LinkActivity.kt
+@@ -5,6 +5,7 @@ import android.graphics.Bitmap
+ import android.graphics.Canvas
+ import android.graphics.Paint
+ import android.graphics.Rect
++import okio.Path.Companion.toOkioPath
+ import android.media.AudioAttributes
+ import android.media.AudioFormat
+ import android.media.AudioTrack
+@@ -101,10 +102,16 @@ class LinkActivity : ComponentActivity() {
+     private var secondGrid: LinkGrid? = null
+     private var ltDown = false
+     private var rtDown = false
++    /** TOUCH CONTROLS (the setup's row): 0 under the games, 1 between them, 2 off. */
++    private var touchMode by mutableStateOf(0)
++    private var touchView: TouchControlsView? = null
++    private var touchShown by mutableStateOf(false)
++    private val skinStore by lazy { com.pokedaisy.app.companion.DeltaSkinStore(filesDir.toOkioPath() / "skins") }
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+         prefs = Prefs(this)
++        touchMode = prefs.linkTouch
+         com.pokedaisy.app.companion.i18n.L10n.apply(prefs.appLanguage, null)
+         input.setControls(GbaControls.load(controlsDir))
+         intent?.getStringExtra(EXTRA_ROM)?.let { File(it) }?.takeIf { it.isFile }?.let { slots.add(it) }
+@@ -254,6 +261,35 @@ class LinkActivity : ComponentActivity() {
+     private fun setFf(on: Boolean) {
+         ffState = on
+         ff = on
++        touchView?.ffOn = on
++    }
++
++    /** The on-screen pad (SETTINGS > TOUCH CONTROLS' look, skin and SHOW) for the focused game: its buttons are the focused game's keys. */
++    private fun makeTouch(ctx: Context): TouchControlsView {
++        val style = prefs.touchControlsStyle
++        val show = when (style.show) {
++            com.pokedaisy.app.companion.TouchShow.ALWAYS -> true
++            com.pokedaisy.app.companion.TouchShow.NEVER -> false
++            com.pokedaisy.app.companion.TouchShow.AUTO -> !Controllers.anyConnected()
++        }
++        touchShown = show
++        return TouchControlsView(ctx).also { v ->
++            v.style = style
++            v.shoulders = true
++            v.gameAspect = 1.5f
++            v.ffOn = ffState
++            v.unavailable = setOf(
++                com.pokedaisy.app.companion.TouchButton.ZOOM, com.pokedaisy.app.companion.TouchButton.REWIND,
++                com.pokedaisy.app.companion.TouchButton.QUICK_MENU, com.pokedaisy.app.companion.TouchButton.SAVE_STATE,
++                com.pokedaisy.app.companion.TouchButton.LOAD_STATE, com.pokedaisy.app.companion.TouchButton.X,
++                com.pokedaisy.app.companion.TouchButton.Y,
++            )
++            v.skin = if (show) style.skinFor(com.pokedaisy.app.companion.SkinSystem.GBA)?.let { skinStore.load(it) } else null
++            v.onMask = { gba, turbo -> input.setTouchBits(gba, turbo) }
++            v.onAction = { b, down -> if (b == com.pokedaisy.app.companion.TouchButton.FF && down) setFf(!ffState) }
++            v.visibility = if (show) View.VISIBLE else View.GONE
++            touchView = v
++        }
+     }
+ 
+     /** The link thread: a frame of every game, the focused one's keys and sound; its blocking audio writes pace it. With
+@@ -400,6 +436,12 @@ class LinkActivity : ComponentActivity() {
+                             slots.indices.map { i -> tr("GAME {0}", i + 1) to slotValue(i) }, canAdd = slots.size < LinkCore.MAX_GAMES, m,
+                             onPick = { pick(it) }, onAdd = { pick(slots.size) }, modifier = Modifier.weight(1f, fill = false),
+                         )
++                        com.pokedaisy.app.companion.ui.OptionRows(
++                            listOf(Triple<String, String?, () -> Unit>(
++                                tk("TOUCH CONTROLS"),
++                                when (touchMode) { 0 -> tk("BELOW"); 1 -> tk("BETWEEN"); else -> tk("OFF") },
++                            ) { touchMode = (touchMode + 1) % 3; prefs.linkTouch = touchMode }), m,
++                        )
+                         GbaText(
+                             tr("Up to four GBA games run at once, joined as if by a link cable: trade, battle and mix records at the games' own Pokémon Centers. Tap a game to play it (L2 / R2 on a controller). The same game twice plays its second copy on a save of its own."),
+                             OptionColors.label, OptionColors.labelShadow, rememberGbaTextMetrics(0.8f), maxLines = Int.MAX_VALUE,
+@@ -435,8 +477,16 @@ class LinkActivity : ComponentActivity() {
+     @Composable
+     private fun Playing(m: GbaTextMetrics) {
+         Box(Modifier.fillMaxSize().background(Color.Black)) {
++            val portrait = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
++                android.content.res.Configuration.ORIENTATION_PORTRAIT
+             AndroidView(
+-                factory = { ctx -> LinkGrid(ctx).apply { views.take(mainCount).forEach { (it.parent as? ViewGroup)?.removeView(it); addView(it) } } },
++                factory = { ctx ->
++                    LinkGrid(ctx).apply {
++                        views.take(mainCount).forEach { (it.parent as? ViewGroup)?.removeView(it); addView(it) }
++                        if (touchMode != 2) attachControls(makeTouch(ctx), touchMode == 1)
++                    }
++                },
++                update = { it.controlsPortrait = portrait },
+                 modifier = Modifier.fillMaxSize(),
+             )
+             if (hint) {
+@@ -451,7 +501,7 @@ class LinkActivity : ComponentActivity() {
+                 }
+             }
+             // FF: a toggle in the corner (lit red while on), over whichever game sits there.
+-            OptionButton(
++            if (!touchShown || touchMode == 2) OptionButton(
+                 tk("FF"), m, onClick = { setFf(!ffState) }, emphasis = ffState,
+                 modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
+             )
+@@ -491,37 +541,81 @@ class LinkActivity : ComponentActivity() {
+ }
+ 
+ /** The games on one screen: one fills it, two side by side (or one over the other on a tall screen), three or four in
+- * a 2 x 2 grid. */
++ * a 2 x 2 grid. With the TOUCH CONTROLS pad ([attachControls]) held upright it goes under the games, or between two rows
++ * of them; held sideways it floats over them. */
+ class LinkGrid(context: Context) : ViewGroup(context) {
+     init {
+         setBackgroundColor(android.graphics.Color.BLACK)
+     }
+ 
++    private var controls: TouchControlsView? = null
++    private var between = false
++
++    /** A phone held upright (the pad takes its own room) or sideways (the pad floats over the games). */
++    var controlsPortrait = true
++        set(value) {
++            field = value
++            controls?.let { it.portrait = value; it.passMisses = !value }
++            requestLayout()
++        }
++
++    fun attachControls(view: TouchControlsView, between: Boolean) {
++        controls?.let { removeView(it) }
++        (view.parent as? ViewGroup)?.removeView(view)
++        controls = view
++        this.between = between
++        view.portrait = controlsPortrait
++        view.passMisses = !controlsPortrait
++        addView(view)
++    }
++
++    private fun games() = childCount - if (controls != null) 1 else 0
++
+     private fun cells(w: Int, h: Int): Pair<Int, Int> = when {
+-        childCount <= 1 -> 1 to 1
+-        childCount == 2 -> if (w >= h) 2 to 1 else 1 to 2
++        games() <= 1 -> 1 to 1
++        games() == 2 -> if (w >= h) 2 to 1 else 1 to 2
+         else -> 2 to 2
+     }
+ 
++    /** Each child's box: the games', then the pad's. */
++    private fun place(w: Int, h: Int): List<Rect> {
++        val n = games()
++        val out = ArrayList<Rect>()
++        val pad = controls?.takeIf { it.visibility == VISIBLE }
++        val reserve = if (pad != null && w < h) minOf((w * 0.62f).toInt(), (h * 0.45f).toInt()) else 0
++        val gh = h - reserve
++        if (reserve > 0 && between && n >= 2) {
++            val cols = if (n == 2) 1 else 2
++            val half = gh / 2
++            for (i in 0 until n) {
++                val x = (i % cols) * (w / cols)
++                val y = if (i / cols == 0) 0 else half + reserve
++                out.add(Rect(x, y, x + w / cols, y + half))
++            }
++            if (controls != null) out.add(Rect(0, half, w, half + reserve))
++        } else {
++            val (cols, rows) = cells(w, gh)
++            for (i in 0 until n) {
++                val x = (i % cols) * (w / cols)
++                val y = (i / cols) * (gh / rows)
++                out.add(Rect(x, y, x + w / cols, y + gh / rows))
++            }
++            if (controls != null) out.add(if (reserve > 0) Rect(0, gh, w, h) else Rect(0, 0, w, h))
++        }
++        return out
++    }
++
+     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+         val w = MeasureSpec.getSize(widthMeasureSpec)
+         val h = MeasureSpec.getSize(heightMeasureSpec)
+-        val (cols, rows) = cells(w, h)
+-        for (i in 0 until childCount) {
+-            getChildAt(i).measure(MeasureSpec.makeMeasureSpec(w / cols, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(h / rows, MeasureSpec.EXACTLY))
++        place(w, h).forEachIndexed { i, r ->
++            getChildAt(i).measure(MeasureSpec.makeMeasureSpec(r.width(), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(r.height(), MeasureSpec.EXACTLY))
+         }
+         setMeasuredDimension(w, h)
+     }
+ 
+     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+-        val w = r - l
+-        val h = b - t
+-        val (cols, rows) = cells(w, h)
+-        for (i in 0 until childCount) {
+-            val x = (i % cols) * (w / cols)
+-            val y = (i / cols) * (h / rows)
+-            getChildAt(i).layout(x, y, x + w / cols, y + h / rows)
+-        }
++        place(r - l, b - t).forEachIndexed { i, rect -> getChildAt(i).layout(rect.left, rect.top, rect.right, rect.bottom) }
+     }
+ }
+ 
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt b/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt
 index 6a0051e..9f278a3 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt
@@ -303,13 +504,18 @@ index a1dd5e1..7ecd930 100644
      }
  }
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt b/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt
-index 771ad54..f0e3614 100644
+index 771ad54..0626fd3 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt
 +++ b/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt
-@@ -874,6 +874,16 @@ class Prefs(
+@@ -874,6 +874,21 @@ class Prefs(
          get() = p.getString("extra_save_dirs", null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty()
          set(v) = p.edit().putString("extra_save_dirs", v.distinct().joinToString("\n")).apply()
  
++    /** LINK PLAY's TOUCH CONTROLS: 0 under the games, 1 between them (two or more games), 2 off. */
++    var linkTouch: Int
++        get() = p.getInt("link_touch", 0)
++        set(v) = p.edit().putInt("link_touch", v).apply()
++
 +    /** Settings > FOLDERS > GBA BIOS: the player's BIOS file ([GbaBios]); null = none picked. */
 +    var gbaBiosPath: String?
 +        get() = p.getString("gba_bios_path", null)
@@ -428,10 +634,10 @@ index f44056f..45e061e 100644
  
      /**
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt
-index e14a553..5732d06 100644
+index e14a553..0ac8234 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt
 +++ b/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt
-@@ -757,4 +757,10 @@ internal val trSettings: Map<String, Tr> = mapOf(
+@@ -757,4 +757,12 @@ internal val trSettings: Map<String, Tr> = mapOf(
      "The group buttons beside this list" to Tr(ja = "この リストの よこの グループ ボタン", fr = "Les boutons de groupe à côté de la liste", de = "Die Gruppenknöpfe neben dieser Liste", it = "I pulsanti dei gruppi accanto alla lista", es = "Los botones de grupo junto a esta lista", br = "Os botões de grupo ao lado desta lista", pt = "Os botões de grupo ao lado desta lista", ko = "이 목록 옆의 그룹 버튼"),
      "LEVEL CAP" to Tr(ja = "レベルじょうげん", fr = "NIVEAU MAX", de = "LEVEL-GRENZE", it = "LIVELLO MAX", es = "NIVEL MÁXIMO", br = "NÍVEL MÁXIMO", pt = "NÍVEL MÁXIMO", ko = "레벨 제한"),
      "Stops at the next boss's top level" to Tr(ja = "つぎの ボスの いちばん たかい レベルで とまる", fr = "S'arrête au niveau max du prochain boss", de = "Stoppt beim höchsten Level des nächsten Bosses", it = "Si ferma al livello più alto del prossimo boss", es = "Se detiene en el nivel más alto del próximo jefe", br = "Para no nível mais alto do próximo chefe", pt = "Para no nível mais alto do próximo chefe", ko = "다음 보스의 최고 레벨에서 멈춰요"),
@@ -441,6 +647,8 @@ index e14a553..5732d06 100644
 +    "GBA BIOS added and on. It isn't the usual retail file, but it looks like a GBA BIOS." to Tr(ja = "GBA BIOSを ついかして オンに しました。 ふつうの せいひんばんの ファイルでは ありませんが、 GBA BIOSに みえます。", fr = "BIOS GBA ajouté et activé. Ce n'est pas le fichier commercial habituel, mais il ressemble à un BIOS GBA.", de = "GBA-BIOS hinzugefügt und aktiviert. Es ist nicht die übliche Handelsversion, sieht aber wie ein GBA-BIOS aus.", it = "BIOS GBA aggiunto e attivato. Non è il solito file commerciale, ma sembra un BIOS GBA.", es = "BIOS de GBA añadido y activado. No es el archivo comercial habitual, pero parece un BIOS de GBA.", br = "BIOS do GBA adicionada e ativada. Não é o arquivo comercial usual, mas parece uma BIOS de GBA.", pt = "BIOS do GBA adicionada e ativada. Não é o ficheiro comercial habitual, mas parece uma BIOS de GBA.", ko = "GBA BIOS를 추가하고 켰습니다. 일반 정식 파일은 아니지만 GBA BIOS처럼 보입니다."),
 +    "EDIT" to Tr(ja = "へんしゅう", fr = "MODIFIER", de = "BEARBEITEN", it = "MODIFICA", es = "EDITAR", br = "EDITAR", pt = "EDITAR", ko = "편집"),
 +    "EDIT CHEAT" to Tr(ja = "チートを へんしゅう", fr = "MODIFIER LE CHEAT", de = "CHEAT BEARBEITEN", it = "MODIFICA CHEAT", es = "EDITAR TRUCO", br = "EDITAR CHEAT", pt = "EDITAR CHEAT", ko = "치트 편집"),
++    "BELOW" to Tr(ja = "した", fr = "EN DESSOUS", de = "DARUNTER", it = "SOTTO", es = "ABAJO", br = "ABAIXO", pt = "ABAIXO", ko = "아래"),
++    "BETWEEN" to Tr(ja = "あいだ", fr = "ENTRE", de = "DAZWISCHEN", it = "IN MEZZO", es = "ENTRE", br = "ENTRE", pt = "ENTRE", ko = "사이"),
  )
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/CheatAddForm.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/CheatAddForm.kt
 index c705e4b..bd077ac 100644

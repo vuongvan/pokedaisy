@@ -1,0 +1,117 @@
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/SaveEditorActivity.kt b/app/src/main/kotlin/com/pokedaisy/app/SaveEditorActivity.kt
+index bd5c5bd..6d8d406 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/SaveEditorActivity.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/SaveEditorActivity.kt
+@@ -62,8 +62,10 @@ class SaveEditorActivity : ComponentActivity() {
+         val file: Gen3SaveFile?,
+         val ds: Pair<com.pokedaisy.app.companion.data.save.Gen4SaveFile, com.pokedaisy.app.companion.data.save.Gen4GameData>? = null,
+         val gen5: Pair<com.pokedaisy.app.companion.data.save.Gen5SaveFile, com.pokedaisy.app.companion.data.save.Gen5GameData>? = null,
++        /** An Epsilon save: Emerald's for the Pokémon, its own bag and trainer data (not edited). */
++        val pcOnly: Boolean = false,
+     ) {
+-        fun editor(): com.pokedaisy.app.companion.data.save.MonSaveEditor = file?.let { Gen3SaveEditor(it) }
++        fun editor(): com.pokedaisy.app.companion.data.save.MonSaveEditor = file?.let { Gen3SaveEditor(it, pcOnly) }
+             ?: ds?.let { (f, g) -> com.pokedaisy.app.companion.data.save.Gen4SaveEditor(f, g) }
+             ?: gen5!!.let { (f, g) -> com.pokedaisy.app.companion.data.save.Gen5SaveEditor(f, g) }
+     }
+@@ -557,7 +559,7 @@ class SaveEditorActivity : ComponentActivity() {
+             is Gen3SaveFile.Parsed.Ok -> {
+                 val why = Gen3SaveData(parsed.save).mismatch()
+                 if (why != null) tr("This save doesn't look like a {0} save ({1}), so it's left alone.", format.label, why)
+-                else Opened(rom, GameTitles.label(this, prefs, rom), RomIdentity.gameCode(rom).orEmpty(), bytes, parsed.save)
++                else Opened(rom, GameTitles.label(this, prefs, rom), RomIdentity.gameCode(rom).orEmpty(), bytes, parsed.save, pcOnly = SaveFileEdits.isEpsilon(rom))
+             }
+         }
+     }
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/SaveFileEdits.kt b/app/src/main/kotlin/com/pokedaisy/app/SaveFileEdits.kt
+index 11fb60e..130cc5f 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/SaveFileEdits.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/SaveFileEdits.kt
+@@ -31,9 +31,20 @@ object SaveFileEdits {
+         class Failed(val reason: String) : Result()
+     }
+ 
++    /** Pokémon Epsilon Emerald v1.0.0 / v1.0.3 (32 MB): its save is Emerald's (the same sectors, block sizes, party and PC records), as its
++     * author says and its saves check out (every sector's checksum with Emerald's sizes, every Pokémon's); only the Pokémon are edited
++     * (its bag and trainer data aren't laid out as Emerald's). */
++    private val EPSILON_SHA1S = setOf("8decf0571ba3f17d31c76168346e240a14e248ce", "fec5d3190cf396fa21d4bed815f088289501a78d")
++
++    fun isEpsilon(rom: File): Boolean =
++        RomIdentity.gameCode(rom) == "BPEE" && RomArchive.romSize(rom) == EPSILON_SIZE && RomIdentity.sha1(rom) in EPSILON_SHA1S
++
++    private const val EPSILON_SIZE = 33431556L
++
+     /** The save format the editor reads [rom]'s save in, or null if it has none (hacks too big to be in-place edits, GB, Japanese). */
+     fun formatFor(rom: File): Gen3SaveFormat? {
+         if (RomIdentity.isGameBoy(rom)) return null
++        if (isEpsilon(rom)) return Gen3SaveFormat.EMERALD
+         if (RomArchive.romSize(rom) > 0x1000000L) return null
+         val code = RomIdentity.gameCode(rom)
+         // 16 MB builds under a retail header whose save isn't retail's: read as retail, they come out as other species at
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/save/Gen3SaveData.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/save/Gen3SaveData.kt
+index 627e74e..1e5c57d 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/data/save/Gen3SaveData.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/save/Gen3SaveData.kt
+@@ -208,7 +208,10 @@ private val POCKETS = listOf(
+     PocketKind.BERRIES to BagPocket.BERRIES, PocketKind.KEY to BagPocket.KEY,
+ )
+ 
+-class Gen3SaveEditor(val file: Gen3SaveFile) : MonSaveEditor, TrainerBagEditor {
++class Gen3SaveEditor(val file: Gen3SaveFile, private val pcOnly: Boolean = false) : MonSaveEditor, TrainerBagEditor {
++    /** [pcOnly]: a build with an Emerald save for its Pokémon but a bag and trainer data of its own (Epsilon): the POKéMON page alone. */
++    override val editsBagAndTrainer: Boolean get() = !pcOnly
++
+     private fun refuseIf(condition: Boolean, why: () -> String) { if (condition) throw SaveEditRefused(why()) }
+     private fun refuse(why: String): Nothing = throw SaveEditRefused(why)
+ 
+@@ -217,7 +220,7 @@ class Gen3SaveEditor(val file: Gen3SaveFile) : MonSaveEditor, TrainerBagEditor {
+     private val storage = file.storage.copyOf()
+ 
+     override val data: Gen3SaveData get() = Gen3SaveData(file.format, saveBlock2, saveBlock1, storage)
+-    override fun fresh(): MonSaveEditor = Gen3SaveEditor(file)
++    override fun fresh(): MonSaveEditor = Gen3SaveEditor(file, pcOnly)
+     override fun snapshot() = EditorSnapshot(listOf(saveBlock2.copyOf(), saveBlock1.copyOf(), storage.copyOf()))
+     override fun restore(snapshot: EditorSnapshot) {
+         snapshot.parts.zip(listOf(saveBlock2, saveBlock1, storage)).forEach { (from, to) -> from.copyInto(to) }
+@@ -304,6 +307,7 @@ class Gen3SaveEditor(val file: Gen3SaveFile) : MonSaveEditor, TrainerBagEditor {
+      * with Unown's / Spinda's personality kept when it's the first one caught (HandleSetPokedexFlag).
+      */
+     fun markCaught(species: Int, personality: Long) {
++        if (pcOnly) return  // Epsilon's Pokédex isn't laid out as Emerald's: left as it is
+         val n = speciesNationalDex.getOrNull(species)?.takeIf { it in 1..NATIONAL_DEX_COUNT } ?: return
+         val first = !caught(species)
+         setDexBit(saveBlock2, seenOff, n)
+@@ -649,6 +653,7 @@ class Gen3SaveEditor(val file: Gen3SaveFile) : MonSaveEditor, TrainerBagEditor {
+ 
+     /** Marks every species [species] as seen (all three copies), and caught too when [caught]. */
+     fun markDex(species: Iterable<Int>, caught: Boolean) {
++        if (pcOnly) return
+         for (s in species) {
+             val n = speciesNationalDex.getOrNull(s)?.takeIf { it in 1..NATIONAL_DEX_COUNT } ?: continue
+             setDexBit(saveBlock2, seenOff, n)
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/save/SaveModel.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/save/SaveModel.kt
+index 82a2be8..94d38b9 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/data/save/SaveModel.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/save/SaveModel.kt
+@@ -183,6 +183,8 @@ class DexSummary(
+  * and changed only to what the game itself could hold (an [IllegalArgumentException] for a value the screens never offer).
+  */
+ interface TrainerBagEditor {
++    /** False where only the Pokémon are edited (no BAG or TRAINER page). */
++    val editsBagAndTrainer: Boolean get() = true
+     val money: Long
+     val maxMoney: Long
+     /** "H:MM" played, or null where it isn't read. */
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/PcBoxesScreen.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/PcBoxesScreen.kt
+index 9856e5d..188f3de 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/PcBoxesScreen.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/PcBoxesScreen.kt
+@@ -242,7 +242,7 @@ fun PcBoxesScreen(
+             Spacer(Modifier.height(m.u * 4))
+             Row(horizontalArrangement = Arrangement.spacedBy(m.u * 4), verticalAlignment = Alignment.CenterVertically) {
+                 // A DS save has its POKéMON page only (its bag and trainer come later).
+-                for (p in PcBoxesState.Page.entries.filter { state.editor is TrainerBagEditor || it == PcBoxesState.Page.POKEMON }) {
++                for (p in PcBoxesState.Page.entries.filter { it == PcBoxesState.Page.POKEMON || (state.editor as? TrainerBagEditor)?.editsBagAndTrainer == true }) {
+                     OptionButton(
+                         when (p) {
+                             PcBoxesState.Page.POKEMON -> tk("POKéMON")

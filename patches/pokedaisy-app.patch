@@ -87,6 +87,53 @@ index 4d9a791..24bde75 100644
  /** Closes the game: its save written and closed, everything it held freed. Nothing up = nothing to do. */
  void pk_api_deinit(void);
  /** PK_API_PLATFORM_GBA / _GB, or _NONE with no game up. */
+diff --git a/app/src/main/cpp/pk_link.c b/app/src/main/cpp/pk_link.c
+index 46a27c7..feb240b 100644
+--- a/app/src/main/cpp/pk_link.c
++++ b/app/src/main/cpp/pk_link.c
+@@ -275,6 +275,13 @@ unsigned pk_link_video_h(int i) {
+     return i >= 0 && i < count ? players[i].h : 0;
+ }
+ 
++void pk_link_set_render(int i, bool on) {
++    if (i < 0 || i >= count) return;
++    struct GBA* gba = players[i].core->board;
++    gba->video.frameskip = on ? 0 : 59;
++    gba->video.frameskipCounter = 0;
++}
++
+ void pk_link_set_keys(int i, uint32_t keys) {
+     if (i >= 0 && i < count) players[i].core->setKeys(players[i].core, keys);
+ }
+diff --git a/app/src/main/cpp/pk_link.h b/app/src/main/cpp/pk_link.h
+index 7248806..6068565 100644
+--- a/app/src/main/cpp/pk_link.h
++++ b/app/src/main/cpp/pk_link.h
+@@ -29,6 +29,8 @@ const color_t* pk_link_video(int i);
+ unsigned pk_link_video_w(int i);
+ unsigned pk_link_video_h(int i);
+ void pk_link_set_keys(int i, uint32_t keys);
++/** Whether game [i] draws its picture: off, its core still runs (the link stays up) but skips drawing all but one frame in 60. */
++void pk_link_set_render(int i, bool on);
+ 
+ /** Game [i]'s audio since the last frame, interleaved stereo, into [out] (up to [maxFrames] frames); the frames read.
+  * Every game's audio is drained after each frame, so a game that isn't read is simply not heard. */
+diff --git a/app/src/main/cpp/pk_link_jni.c b/app/src/main/cpp/pk_link_jni.c
+index cd22303..77be868 100644
+--- a/app/src/main/cpp/pk_link_jni.c
++++ b/app/src/main/cpp/pk_link_jni.c
+@@ -43,6 +43,11 @@ Java_com_pokedaisy_app_LinkCore_pkLinkRunFrame(JNIEnv* env, jobject thiz) {
+     return pk_link_run_frame() ? JNI_TRUE : JNI_FALSE;
+ }
+ 
++JNIEXPORT void JNICALL
++Java_com_pokedaisy_app_LinkCore_pkLinkSetRender(JNIEnv* env, jobject thiz, jint i, jboolean on) {
++    pk_link_set_render(i, on != JNI_FALSE);
++}
++
+ JNIEXPORT void JNICALL
+ Java_com_pokedaisy_app_LinkCore_pkLinkSetKeys(JNIEnv* env, jobject thiz, jint i, jint mask) {
+     pk_link_set_keys(i, (uint32_t) mask);
 diff --git a/app/src/main/cpp/pk_session.c b/app/src/main/cpp/pk_session.c
 index b84aa2a..41f9fa6 100644
 --- a/app/src/main/cpp/pk_session.c
@@ -215,7 +262,7 @@ index 0000000..eb2b682
 +    }
 +}
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/LinkActivity.kt b/app/src/main/kotlin/com/pokedaisy/app/LinkActivity.kt
-index 9094139..b3780a7 100644
+index 9094139..2a2f9bf 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/LinkActivity.kt
 +++ b/app/src/main/kotlin/com/pokedaisy/app/LinkActivity.kt
 @@ -5,6 +5,7 @@ import android.graphics.Bitmap
@@ -226,12 +273,26 @@ index 9094139..b3780a7 100644
  import android.media.AudioAttributes
  import android.media.AudioFormat
  import android.media.AudioTrack
-@@ -101,10 +102,16 @@ class LinkActivity : ComponentActivity() {
+@@ -19,8 +20,10 @@ import androidx.activity.ComponentActivity
+ import androidx.activity.compose.BackHandler
+ import androidx.activity.compose.setContent
+ import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.Arrangement
+ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
+ import androidx.compose.foundation.layout.Spacer
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.foundation.layout.fillMaxWidth
+@@ -101,10 +104,20 @@ class LinkActivity : ComponentActivity() {
      private var secondGrid: LinkGrid? = null
      private var ltDown = false
      private var rtDown = false
 +    /** TOUCH CONTROLS (the setup's row): 0 under the games, 1 between them, 2 off. */
 +    private var touchMode by mutableStateOf(0)
++    /** VIEW (the setup's row): 0 one game at a time, 1 all of them. */
++    private var viewMode by mutableStateOf(0)
++    private var focusShown by mutableStateOf(0)
 +    private var touchView: TouchControlsView? = null
 +    private var touchShown by mutableStateOf(false)
 +    private val skinStore by lazy { com.pokedaisy.app.companion.DeltaSkinStore(filesDir.toOkioPath() / "skins") }
@@ -240,10 +301,39 @@ index 9094139..b3780a7 100644
          super.onCreate(savedInstanceState)
          prefs = Prefs(this)
 +        touchMode = prefs.linkTouch
++        viewMode = prefs.linkView
          com.pokedaisy.app.companion.i18n.L10n.apply(prefs.appLanguage, null)
          input.setControls(GbaControls.load(controlsDir))
          intent?.getStringExtra(EXTRA_ROM)?.let { File(it) }?.takeIf { it.isFile }?.let { slots.add(it) }
-@@ -254,6 +261,35 @@ class LinkActivity : ComponentActivity() {
+@@ -205,7 +218,9 @@ class LinkActivity : ComponentActivity() {
+                 views = list.indices.map { i -> LinkGameView(this, i, LinkCore.pkLinkVideoWidth(i), LinkCore.pkLinkVideoHeight(i)) { focus(it) } }
+                 mainCount = if (secondScreen() != null) (list.size + 1) / 2 else list.size
+                 focused = 0
++                focusShown = 0
+                 views.forEachIndexed { i, v -> v.focused = i == 0 }
++                applyVisibility()
+                 phase = Phase.PLAYING
+                 hint = true
+                 showSecondScreen()
+@@ -231,7 +246,17 @@ class LinkActivity : ComponentActivity() {
+         if (i !in games.indices || i == focused) return
+         input.releaseAll()
+         focused = i
++        focusShown = i
+         views.forEachIndexed { k, v -> v.focused = k == i }
++        applyVisibility()
++    }
++
++    /** In the one-at-a-time view only the focused game is on the main screen (the others keep running, undrawn: see the link loop). */
++    private fun switching() = viewMode == 0 && mainCount >= 2
++
++    private fun applyVisibility() {
++        val one = switching()
++        views.forEachIndexed { k, v -> if (k < mainCount) v.visibility = if (!one || k == focused) View.VISIBLE else View.GONE }
+     }
+ 
+     private fun cycle(step: Int) {
+@@ -254,6 +279,35 @@ class LinkActivity : ComponentActivity() {
      private fun setFf(on: Boolean) {
          ffState = on
          ff = on
@@ -279,10 +369,45 @@ index 9094139..b3780a7 100644
      }
  
      /** The link thread: a frame of every game, the focused one's keys and sound; its blocking audio writes pace it. With
-@@ -400,6 +436,12 @@ class LinkActivity : ComponentActivity() {
+@@ -270,6 +324,7 @@ class LinkActivity : ComponentActivity() {
+         track.play()
+         val audio = ShortArray(8192)
+         var heard = -1
++        var drawn = -2
+         var frames = 0L
+         var fast = false
+         var next = System.nanoTime()
+@@ -286,6 +341,11 @@ class LinkActivity : ComponentActivity() {
+                     next = System.nanoTime()
+                 }
+                 val f = focused
++                val only = if (switching()) f else -1
++                if (only != drawn) {
++                    for (i in games.indices) LinkCore.pkLinkSetRender(i, only == -1 || i == only)
++                    drawn = only
++                }
+                 if (f != heard) {
+                     for (i in games.indices) LinkCore.pkLinkSetKeys(i, 0)
+                     LinkCore.pkLinkReadAudio(f, audio)   // what it made unheard
+@@ -299,7 +359,7 @@ class LinkActivity : ComponentActivity() {
+                     break
+                 }
+                 val t1 = System.nanoTime()
+-                views.forEachIndexed { i, v -> v.publish { LinkCore.pkLinkCopyVideo(i, it) } }
++                views.forEachIndexed { i, v -> if (only == -1 || i == only) v.publish { LinkCore.pkLinkCopyVideo(i, it) } }
+                 val n = LinkCore.pkLinkReadAudio(f, audio)
+                 if (fast) {
+                     // Paced by the clock; behind (a slow frame), it doesn't race to catch up.
+@@ -400,6 +460,18 @@ class LinkActivity : ComponentActivity() {
                              slots.indices.map { i -> tr("GAME {0}", i + 1) to slotValue(i) }, canAdd = slots.size < LinkCore.MAX_GAMES, m,
                              onPick = { pick(it) }, onAdd = { pick(slots.size) }, modifier = Modifier.weight(1f, fill = false),
                          )
++                        com.pokedaisy.app.companion.ui.OptionRows(
++                            listOf(Triple<String, String?, () -> Unit>(
++                                tk("VIEW"),
++                                if (viewMode == 0) tk("SWITCH") else tk("ALL"),
++                            ) { viewMode = 1 - viewMode; prefs.linkView = viewMode }), m,
++                        )
 +                        com.pokedaisy.app.companion.ui.OptionRows(
 +                            listOf(Triple<String, String?, () -> Unit>(
 +                                tk("TOUCH CONTROLS"),
@@ -292,7 +417,7 @@ index 9094139..b3780a7 100644
                          GbaText(
                              tr("Up to four GBA games run at once, joined as if by a link cable: trade, battle and mix records at the games' own Pokémon Centers. Tap a game to play it (L2 / R2 on a controller). The same game twice plays its second copy on a save of its own."),
                              OptionColors.label, OptionColors.labelShadow, rememberGbaTextMetrics(0.8f), maxLines = Int.MAX_VALUE,
-@@ -435,8 +477,16 @@ class LinkActivity : ComponentActivity() {
+@@ -435,8 +507,16 @@ class LinkActivity : ComponentActivity() {
      @Composable
      private fun Playing(m: GbaTextMetrics) {
          Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -310,16 +435,22 @@ index 9094139..b3780a7 100644
                  modifier = Modifier.fillMaxSize(),
              )
              if (hint) {
-@@ -451,7 +501,7 @@ class LinkActivity : ComponentActivity() {
+@@ -451,7 +531,13 @@ class LinkActivity : ComponentActivity() {
                  }
              }
              // FF: a toggle in the corner (lit red while on), over whichever game sits there.
 -            OptionButton(
++            if (viewMode == 0 && mainCount >= 2) Row(
++                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
++                horizontalArrangement = Arrangement.spacedBy(6.dp),
++            ) {
++                for (i in 0 until mainCount) OptionButton("${i + 1}", m, onClick = { focus(i) }, emphasis = i == focusShown)
++            }
 +            if (!touchShown || touchMode == 2) OptionButton(
                  tk("FF"), m, onClick = { setFf(!ffState) }, emphasis = ffState,
                  modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
              )
-@@ -491,37 +541,81 @@ class LinkActivity : ComponentActivity() {
+@@ -491,37 +577,85 @@ class LinkActivity : ComponentActivity() {
  }
  
  /** The games on one screen: one fills it, two side by side (or one over the other on a tall screen), three or four in
@@ -354,36 +485,40 @@ index 9094139..b3780a7 100644
 +
 +    private fun games() = childCount - if (controls != null) 1 else 0
 +
++    /** The games on show: a GONE one (the other games of the one-at-a-time view) takes no room. */
++    private fun shown(): List<Int> = (0 until games()).filter { getChildAt(it).visibility != GONE }
++
      private fun cells(w: Int, h: Int): Pair<Int, Int> = when {
 -        childCount <= 1 -> 1 to 1
 -        childCount == 2 -> if (w >= h) 2 to 1 else 1 to 2
-+        games() <= 1 -> 1 to 1
-+        games() == 2 -> if (w >= h) 2 to 1 else 1 to 2
++        shown().size <= 1 -> 1 to 1
++        shown().size == 2 -> if (w >= h) 2 to 1 else 1 to 2
          else -> 2 to 2
      }
  
 +    /** Each child's box: the games', then the pad's. */
 +    private fun place(w: Int, h: Int): List<Rect> {
-+        val n = games()
-+        val out = ArrayList<Rect>()
++        val on = shown()
++        val n = on.size
++        val out = ArrayList<Rect>(List(games()) { Rect(0, 0, 0, 0) })
 +        val pad = controls?.takeIf { it.visibility == VISIBLE }
 +        val reserve = if (pad != null && w < h) minOf((w * 0.62f).toInt(), (h * 0.45f).toInt()) else 0
 +        val gh = h - reserve
-+        if (reserve > 0 && between && n >= 2) {
++        if (reserve > 0 && between && n >= 2) {  // BETWEEN needs two on show
 +            val cols = if (n == 2) 1 else 2
 +            val half = gh / 2
-+            for (i in 0 until n) {
-+                val x = (i % cols) * (w / cols)
-+                val y = if (i / cols == 0) 0 else half + reserve
-+                out.add(Rect(x, y, x + w / cols, y + half))
++            for (k in 0 until n) {
++                val x = (k % cols) * (w / cols)
++                val y = if (k / cols == 0) 0 else half + reserve
++                out[on[k]] = Rect(x, y, x + w / cols, y + half)
 +            }
 +            if (controls != null) out.add(Rect(0, half, w, half + reserve))
 +        } else {
 +            val (cols, rows) = cells(w, gh)
-+            for (i in 0 until n) {
-+                val x = (i % cols) * (w / cols)
-+                val y = (i / cols) * (gh / rows)
-+                out.add(Rect(x, y, x + w / cols, y + gh / rows))
++            for (k in 0 until n) {
++                val x = (k % cols) * (w / cols)
++                val y = (k / cols) * (gh / rows)
++                out[on[k]] = Rect(x, y, x + w / cols, y + gh / rows)
 +            }
 +            if (controls != null) out.add(if (reserve > 0) Rect(0, gh, w, h) else Rect(0, 0, w, h))
 +        }
@@ -415,6 +550,19 @@ index 9094139..b3780a7 100644
      }
  }
  
+diff --git a/app/src/main/kotlin/com/pokedaisy/app/LinkCore.kt b/app/src/main/kotlin/com/pokedaisy/app/LinkCore.kt
+index 2ae51bd..b6f1c9b 100644
+--- a/app/src/main/kotlin/com/pokedaisy/app/LinkCore.kt
++++ b/app/src/main/kotlin/com/pokedaisy/app/LinkCore.kt
+@@ -20,6 +20,8 @@ object LinkCore {
+     /** One frame of every game. False on a link fault (every game waiting on another). */
+     external fun pkLinkRunFrame(): Boolean
+     external fun pkLinkSetKeys(game: Int, mask: Int)
++    /** Whether game [game] draws its picture: off, it keeps running linked but skips the drawing (the cost of showing every game). */
++    external fun pkLinkSetRender(game: Int, on: Boolean)
+     external fun pkLinkVideoWidth(game: Int): Int
+     external fun pkLinkVideoHeight(game: Int): Int
+     /** The game's last frame into [dst] (direct, width * height * 4 bytes) as opaque RGBA. */
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt b/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt
 index 6a0051e..9f278a3 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/MgbaCore.kt
@@ -504,13 +652,18 @@ index a1dd5e1..7ecd930 100644
      }
  }
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt b/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt
-index 771ad54..0626fd3 100644
+index 771ad54..b6dbd23 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt
 +++ b/app/src/main/kotlin/com/pokedaisy/app/Prefs.kt
-@@ -874,6 +874,21 @@ class Prefs(
+@@ -874,6 +874,26 @@ class Prefs(
          get() = p.getString("extra_save_dirs", null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty()
          set(v) = p.edit().putString("extra_save_dirs", v.distinct().joinToString("\n")).apply()
  
++    /** LINK PLAY's VIEW: 0 one game at a time (a switch; the others keep running linked, undrawn), 1 every game on the screen. */
++    var linkView: Int
++        get() = p.getInt("link_view", 0)
++        set(v) = p.edit().putInt("link_view", v).apply()
++
 +    /** LINK PLAY's TOUCH CONTROLS: 0 under the games, 1 between them (two or more games), 2 off. */
 +    var linkTouch: Int
 +        get() = p.getInt("link_touch", 0)
@@ -634,10 +787,10 @@ index f44056f..45e061e 100644
  
      /**
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt
-index e14a553..0ac8234 100644
+index e14a553..09fd89f 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt
 +++ b/app/src/main/kotlin/com/pokedaisy/app/companion/i18n/TrSettings.kt
-@@ -757,4 +757,12 @@ internal val trSettings: Map<String, Tr> = mapOf(
+@@ -757,4 +757,13 @@ internal val trSettings: Map<String, Tr> = mapOf(
      "The group buttons beside this list" to Tr(ja = "この リストの よこの グループ ボタン", fr = "Les boutons de groupe à côté de la liste", de = "Die Gruppenknöpfe neben dieser Liste", it = "I pulsanti dei gruppi accanto alla lista", es = "Los botones de grupo junto a esta lista", br = "Os botões de grupo ao lado desta lista", pt = "Os botões de grupo ao lado desta lista", ko = "이 목록 옆의 그룹 버튼"),
      "LEVEL CAP" to Tr(ja = "レベルじょうげん", fr = "NIVEAU MAX", de = "LEVEL-GRENZE", it = "LIVELLO MAX", es = "NIVEL MÁXIMO", br = "NÍVEL MÁXIMO", pt = "NÍVEL MÁXIMO", ko = "레벨 제한"),
      "Stops at the next boss's top level" to Tr(ja = "つぎの ボスの いちばん たかい レベルで とまる", fr = "S'arrête au niveau max du prochain boss", de = "Stoppt beim höchsten Level des nächsten Bosses", it = "Si ferma al livello più alto del prossimo boss", es = "Se detiene en el nivel más alto del próximo jefe", br = "Para no nível mais alto do próximo chefe", pt = "Para no nível mais alto do próximo chefe", ko = "다음 보스의 최고 레벨에서 멈춰요"),
@@ -649,6 +802,7 @@ index e14a553..0ac8234 100644
 +    "EDIT CHEAT" to Tr(ja = "チートを へんしゅう", fr = "MODIFIER LE CHEAT", de = "CHEAT BEARBEITEN", it = "MODIFICA CHEAT", es = "EDITAR TRUCO", br = "EDITAR CHEAT", pt = "EDITAR CHEAT", ko = "치트 편집"),
 +    "BELOW" to Tr(ja = "した", fr = "EN DESSOUS", de = "DARUNTER", it = "SOTTO", es = "ABAJO", br = "ABAIXO", pt = "ABAIXO", ko = "아래"),
 +    "BETWEEN" to Tr(ja = "あいだ", fr = "ENTRE", de = "DAZWISCHEN", it = "IN MEZZO", es = "ENTRE", br = "ENTRE", pt = "ENTRE", ko = "사이"),
++    "VIEW" to Tr(ja = "ひょうじ", fr = "AFFICHAGE", de = "ANSICHT", it = "VISTA", es = "VISTA", br = "VISUALIZAÇÃO", pt = "VISUALIZAÇÃO", ko = "보기"),
  )
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/ui/CheatAddForm.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/ui/CheatAddForm.kt
 index c705e4b..bd077ac 100644

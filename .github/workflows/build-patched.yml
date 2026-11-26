@@ -122,4 +122,4 @@ jobs:
           name: pokedaisy-release-apk
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 2

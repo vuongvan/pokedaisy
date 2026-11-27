@@ -1,0 +1,8 @@
+# Patch order: one file name per line, applied top to bottom. A patch not listed here is skipped, so a line
+# can be commented out (with #) to turn that patch off. A listed file that is missing stops the build.
+pokedaisy-core.patch
+pokedaisy-soulgold.patch
+pokedaisy-quetzal.patch
+pokedaisy-epsilon.patch
+pokedaisy-anygame.patch
+pokedaisy-app.patch

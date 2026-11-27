@@ -25,10 +25,10 @@ index ef5ee4b..7f38fdf 100644
  }
  
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/EpsilonEmerald.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/EpsilonEmerald.kt
-index 482c131..03858f9 100644
+index 482c131..d1ae8d4 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/companion/data/EpsilonEmerald.kt
 +++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/EpsilonEmerald.kt
-@@ -1,16 +1,29 @@
+@@ -1,16 +1,36 @@
  package com.pokedaisy.app.companion.data
  
  /**
@@ -59,11 +59,18 @@ index 482c131..03858f9 100644
 +    pc = PcFns(0x088C6BE4L, 63, 0x08A4A5F8L, 0x089004D1L, listOf(0x794EBC3DL, 0x3CAA3515L)),
 +    fly = null,
 +)
++
++/** v1.0.4's guide tables (HERE's wild Pokémon): v1.0.0's at the rebuilt ROM's addresses, each found by its content: gTrainers 0x08BFCA4C (0x24 bytes, 265 is
++ * Roxanne, the names around her read right), gWildMonHeaders 0x08FB950C (0x18 bytes, 145 headers; ROUTE 101's land is WURMPLE / POOCHYENA / ZIGZAGOON
++ * Lv2-3) and gMapGroups 0x08E2BFC4 (34 groups, found from the live gMapHeader's bytes in the ROM). */
++val GUIDE_TABLES_EPSILON_EMERALD_V1_0_4 = GUIDE_TABLES_EPSILON_EMERALD.copy(
++    trainers = 0x08BFCA4CL, wildHeaders = 0x08FB950CL, mapGroups = 0x08E2BFC4L,
++)
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/NativeConfigsGen.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/NativeConfigsGen.kt
-index 83e4ff4..fea0358 100644
+index 83e4ff4..1485b68 100644
 --- a/app/src/main/kotlin/com/pokedaisy/app/companion/data/NativeConfigsGen.kt
 +++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/NativeConfigsGen.kt
-@@ -3435,6 +3435,116 @@ val NATIVE_EPSILON_EMERALD = NativeConfig(
+@@ -3435,6 +3435,117 @@ val NATIVE_EPSILON_EMERALD = NativeConfig(
      fieldItems = FIELD_ITEMS_EPSILON_EMERALD,
  )
  
@@ -175,6 +182,7 @@ index 83e4ff4..fea0358 100644
 +    partyMenu = 0x0203DE40L,
 +    pokedex = POKEDEX_EPSILON_EMERALD_V1_0_4,
 +    fieldItems = FIELD_ITEMS_EPSILON_EMERALD_V1_0_4,
++    guideTables = GUIDE_TABLES_EPSILON_EMERALD_V1_0_4,
 +)
 +
  // ---- gamedata/gen3/hacks/gaia.toml ----
@@ -273,10 +281,10 @@ index b59544c..b784691 100644
 +    ROM_EXTRAS_EPSILON,
  )
 diff --git a/gamedata/gen3/hacks/epsilon_emerald.toml b/gamedata/gen3/hacks/epsilon_emerald.toml
-index e80869c..3ce2472 100644
+index e80869c..eff72a9 100644
 --- a/gamedata/gen3/hacks/epsilon_emerald.toml
 +++ b/gamedata/gen3/hacks/epsilon_emerald.toml
-@@ -73,3 +73,111 @@ partyMenu = 0x0203DE3C
+@@ -73,3 +73,112 @@ partyMenu = 0x0203DE3C
  pokedex = 'POKEDEX_EPSILON_EMERALD'
  guideTables = 'GUIDE_TABLES_EPSILON_EMERALD'
  fieldItems = 'FIELD_ITEMS_EPSILON_EMERALD'
@@ -388,3 +396,4 @@ index e80869c..3ce2472 100644
 +partyMenu = 0x0203DE40
 +pokedex = 'POKEDEX_EPSILON_EMERALD_V1_0_4'
 +fieldItems = 'FIELD_ITEMS_EPSILON_EMERALD_V1_0_4'
++guideTables = 'GUIDE_TABLES_EPSILON_EMERALD_V1_0_4'

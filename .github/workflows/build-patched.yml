@@ -16,13 +16,19 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
-      - name: Apply every patch in patches/
+      - name: Apply the patches listed in patches/series
         run: |
-          shopt -s nullglob
+          [ -f patches/series ] || { echo "patches/series is missing"; exit 1; }
+          while IFS= read -r line; do
+            name="${line%%#*}"; name="$(echo "$name" | xargs)"
+            [ -z "$name" ] && continue
+            [ -f "patches/$name" ] || { echo "listed but missing: patches/$name"; exit 1; }
+            echo "applying $name"
+            git apply --check "patches/$name"
+            git apply "patches/$name"
+          done < patches/series
           for p in patches/*.patch; do
-            echo "applying $p"
-            git apply --check "$p"
-            git apply "$p"
+            grep -qx "$(basename "$p")" patches/series || echo "::warning::$(basename "$p") is not in patches/series, skipped"
           done
 
       # Only the sources the Android build compiles: mGBA, rcheevos, melonDS, DSperate (not Azahar, BananaDS, gpSP...), shallow.
@@ -122,4 +128,4 @@ jobs:
           name: pokedaisy-release-apk
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
-          retention-days: 2
+          retention-days: 14

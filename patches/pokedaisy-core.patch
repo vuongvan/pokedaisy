@@ -174,10 +174,10 @@ index 0000000..a5bd9f3
 +}
 diff --git a/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomExtrasRegistry.kt b/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomExtrasRegistry.kt
 new file mode 100644
-index 0000000..66ec92a
+index 0000000..b59544c
 --- /dev/null
 +++ b/app/src/main/kotlin/com/pokedaisy/app/companion/data/RomExtrasRegistry.kt
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,41 @@
 +package com.pokedaisy.app.companion.data
 +
 +/**
@@ -199,6 +199,19 @@ index 0000000..66ec92a
 +    //
 +    //
 +    // ---- slots below: quetzal ----------------------------------------------------------------
++    //
++    //
++    //
++    //
++    //
++    //
++    //
++    //
++    //
++    //
++    //
++    //
++    // ---- slots below: epsilon ----------------------------------------------------------------
 +    //
 +    //
 +    //
